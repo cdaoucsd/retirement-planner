@@ -670,22 +670,36 @@ const DEFAULTS = {
   pensionEnabled: false, pensionMonthly: 1500, pensionStartAge: 65,
 };
 
-export default function RetirementPlanner() {
-  const [retirementAge, setRetirementAge] = useState(DEFAULTS.retirementAge);
-  const [lifeExpectancy, setLifeExpectancy] = useState(DEFAULTS.lifeExpectancy);
-  const [annualSpending, setAnnualSpending] = useState(DEFAULTS.annualSpending);
-  const [withdrawalMode, setWithdrawalMode] = useState(DEFAULTS.withdrawalMode); // "fixed" | "rate"
-  const [withdrawalRate, setWithdrawalRate] = useState(DEFAULTS.withdrawalRate);
-  const [inflationRate, setInflationRate] = useState(DEFAULTS.inflationRate);
-  const [birthYear, setBirthYear] = useState(DEFAULTS.birthYear);
-  const [accounts, setAccounts] = useState(DEFAULTS.accounts);
+const STORAGE_KEY = "retirement_planner_state";
 
-  const [ssEnabled, setSSEnabled] = useState(DEFAULTS.ssEnabled);
-  const [ssMonthly, setSSMonthly] = useState(DEFAULTS.ssMonthly);
-  const [ssStartAge, setSSStartAge] = useState(DEFAULTS.ssStartAge);
-  const [pensionEnabled, setPensionEnabled] = useState(DEFAULTS.pensionEnabled);
-  const [pensionMonthly, setPensionMonthly] = useState(DEFAULTS.pensionMonthly);
-  const [pensionStartAge, setPensionStartAge] = useState(DEFAULTS.pensionStartAge);
+function loadSavedState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULTS;
+    const saved = JSON.parse(raw);
+    return { ...DEFAULTS, ...saved, accounts: { ...DEFAULTS.accounts, ...saved.accounts } };
+  } catch {
+    return DEFAULTS;
+  }
+}
+
+export default function RetirementPlanner() {
+  const [saved] = useState(loadSavedState);
+  const [retirementAge, setRetirementAge] = useState(saved.retirementAge);
+  const [lifeExpectancy, setLifeExpectancy] = useState(saved.lifeExpectancy);
+  const [annualSpending, setAnnualSpending] = useState(saved.annualSpending);
+  const [withdrawalMode, setWithdrawalMode] = useState(saved.withdrawalMode); // "fixed" | "rate"
+  const [withdrawalRate, setWithdrawalRate] = useState(saved.withdrawalRate);
+  const [inflationRate, setInflationRate] = useState(saved.inflationRate);
+  const [birthYear, setBirthYear] = useState(saved.birthYear);
+  const [accounts, setAccounts] = useState(saved.accounts);
+
+  const [ssEnabled, setSSEnabled] = useState(saved.ssEnabled);
+  const [ssMonthly, setSSMonthly] = useState(saved.ssMonthly);
+  const [ssStartAge, setSSStartAge] = useState(saved.ssStartAge);
+  const [pensionEnabled, setPensionEnabled] = useState(saved.pensionEnabled);
+  const [pensionMonthly, setPensionMonthly] = useState(saved.pensionMonthly);
+  const [pensionStartAge, setPensionStartAge] = useState(saved.pensionStartAge);
 
   const [activeTab, setActiveTab] = useState("accounts");
   const [hasError, setHasError] = useState(false);
@@ -697,6 +711,18 @@ export default function RetirementPlanner() {
   const safeRetirementAge = clamp(retirementAge, safeCurrentAge + 1, 100);
   const safeLifeExpectancy = clamp(lifeExpectancy, safeRetirementAge + 1, 110);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        retirementAge, lifeExpectancy, annualSpending, withdrawalMode, withdrawalRate,
+        inflationRate, birthYear, accounts,
+        ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge,
+      }));
+    } catch { /* storage unavailable */ }
+  }, [retirementAge, lifeExpectancy, annualSpending, withdrawalMode, withdrawalRate,
+      inflationRate, birthYear, accounts,
+      ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge]);
+
   const resetAll = useCallback(() => {
     setRetirementAge(DEFAULTS.retirementAge); setLifeExpectancy(DEFAULTS.lifeExpectancy);
     setAnnualSpending(DEFAULTS.annualSpending); setWithdrawalMode(DEFAULTS.withdrawalMode);
@@ -706,6 +732,7 @@ export default function RetirementPlanner() {
     setSSStartAge(DEFAULTS.ssStartAge); setPensionEnabled(DEFAULTS.pensionEnabled);
     setPensionMonthly(DEFAULTS.pensionMonthly); setPensionStartAge(DEFAULTS.pensionStartAge);
     setHasError(false); setMcResult(null);
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
   }, []);
 
   const projection = useMemo(() => {
