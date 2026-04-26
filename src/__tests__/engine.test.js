@@ -272,22 +272,24 @@ describe("Roth conversion engine", () => {
     expect(y1.trad401k).toBeCloseTo(1_000_000, -1);
   });
 
-  it("12% bracket fill at age 60 with no other taxable income → conversion ≈ $48,475", () => {
+  it("12% bracket fill at age 60 with no other taxable income → conversion ≈ $63,475 (bracket top + std deduction)", () => {
     const a = runProjection(convScenario());
     const y1 = a.find(d => d.age === 60);
-    expect(y1.conversion).toBeCloseTo(48475, -1);
-    expect(y1.trad401k).toBeCloseTo(1_000_000 - 48475, -1);
-    expect(y1.rothIRA).toBeGreaterThanOrEqual(48475 - 1);
+    // gross income ceiling = $48,475 (taxable bracket top) + $15,000 (standard deduction) = $63,475
+    expect(y1.conversion).toBeCloseTo(63475, -1);
+    expect(y1.trad401k).toBeCloseTo(1_000_000 - 63475, -1);
+    expect(y1.rothIRA).toBeGreaterThanOrEqual(63475 - 1);
   });
 
   it("brokerage covers tax → full conversion lands in Roth", () => {
     const a = runProjection(convScenario());
     const y1 = a.find(d => d.age === 60);
-    // 12% bracket conversion ≈ $48,475; tax ≈ $5,338.5 (10% on first 11925, 12% on rest)
-    // 11925*.10 + (48475-11925)*.12 = 1192.5 + 4386 = 5578.5
+    // gross conversion = $63,475; taxable = $63,475 - $15,000 std deduction = $48,475
+    // tax = 11925*.10 + (48475-11925)*.12 = 1192.5 + 4386 = 5578.5
     expect(y1.conversionTax).toBeCloseTo(5578, -1);
     expect(y1.conversionTaxFromBrokerage).toBeCloseTo(y1.conversionTax, -1);
-    expect(y1.rothIRA).toBeCloseTo(48475, -1);
+    // full $63,475 lands in Roth (tax paid from brokerage)
+    expect(y1.rothIRA).toBeCloseTo(63475, -1);
   });
 
   it("brokerage too small → tax netted from conversion", () => {

@@ -36,6 +36,18 @@ export const TAX_BRACKETS_2025 = [
   { min: 626350,  max: Infinity, rate: 0.37 },
 ];
 
+export const MFJ_TAX_BRACKETS_2025 = [
+  { min: 0,       max: 23850,  rate: 0.10 },
+  { min: 23850,   max: 96950,  rate: 0.12 },
+  { min: 96950,   max: 206700, rate: 0.22 },
+  { min: 206700,  max: 394600, rate: 0.24 },
+  { min: 394600,  max: 501050, rate: 0.32 },
+  { min: 501050,  max: 751600, rate: 0.35 },
+  { min: 751600,  max: Infinity, rate: 0.37 },
+];
+
+export const STANDARD_DEDUCTION_2025 = { single: 15000, mfj: 30000 };
+
 export const MILESTONE_AGES = [
   { age: 55,   label: "Rule of 55",   desc: "Penalty-free 401(k) withdrawal if separated from employer", color: "#2563eb" },
   { age: 59.5, label: "Age 59½", desc: "No more 10% early withdrawal penalty on any account",       color: "#16a34a" },
@@ -183,7 +195,11 @@ export function runProjection(params) {
     pensionEnabled, pensionMonthly, pensionStartAge, birthYear,
     annualIncome = 0, employerMatchPct = 0, employerMatchCapPct = 0,
     rothConversionEnabled = false, rothConversionBracket = 0.12,
+    filingStatus = 'single',
   } = params;
+
+  const baseBrackets = filingStatus === 'mfj' ? MFJ_TAX_BRACKETS_2025 : TAX_BRACKETS_2025;
+  const stdDed = filingStatus === 'mfj' ? STANDARD_DEDUCTION_2025.mfj : STANDARD_DEDUCTION_2025.single;
 
   const cAge = clamp(currentAge, 18, 100);
   const rAge = clamp(retirementAge, cAge + 1, 100);
@@ -219,8 +235,9 @@ export function runProjection(params) {
 
   for (let age = cAge; age <= lAge; age++) {
     const isRetired = age >= rAge;
-    const yearInfl  = Math.pow(1 + infRate / 100, age - cAge);
-    const yrBrackets = inflatedBrackets(yearInfl);
+    const yearInfl      = Math.pow(1 + infRate / 100, age - cAge);
+    const yrBrackets    = inflatedBrackets(yearInfl, baseBrackets);
+    const stdDedInflated = stdDed * yearInfl;
 
     for (const k of ACCT_KEYS) {
       const mr = getR(accounts[k]) / 12;
@@ -250,12 +267,16 @@ export function runProjection(params) {
     if (rothConversionEnabled && inWindow && bal.trad401k > 0) {
       const baseline   = penAnnual + 0.85 * ssAnnual;
       const bracketTop = bracketTopForRate(rothConversionBracket, yrBrackets);
-      const headroom   = Math.max(0, bracketTop - baseline);
+      // bracketTop is taxable-income ceiling; add standard deduction to get gross-income ceiling
+      const headroom   = Math.max(0, bracketTop + stdDedInflated - baseline);
       conversion = Math.min(headroom, bal.trad401k);
       if (conversion > 0) {
+        // Standard deduction applies to total gross income, not split per source.
+        const taxableWithConv = Math.max(0, baseline + conversion - stdDedInflated);
+        const taxableBaseline = Math.max(0, baseline - stdDedInflated);
         conversionTax = Math.max(
           0,
-          calcTax(baseline + conversion, yrBrackets) - calcTax(baseline, yrBrackets)
+          calcTax(taxableWithConv, yrBrackets) - calcTax(taxableBaseline, yrBrackets)
         );
         // Pay tax: brokerage first, fallback net from conversion
         if (bal.brokerage >= conversionTax) {
@@ -290,7 +311,8 @@ export function runProjection(params) {
       }
     }
 
-    const taxableInc = yearW.trad401k + penAnnual + ssAnnual * 0.85 + conversion;
+    const grossInc   = yearW.trad401k + penAnnual + ssAnnual * 0.85 + conversion;
+    const taxableInc = Math.max(0, grossInc - stdDedInflated);
     data.push({
       age,
       trad401k:  Math.max(0, Math.round(safeBal(bal.trad401k))),

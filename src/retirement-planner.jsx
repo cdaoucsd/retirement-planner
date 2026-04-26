@@ -562,6 +562,7 @@ const DEFAULTS = {
   pensionEnabled: false, pensionMonthly: 1500, pensionStartAge: 65,
   annualIncome: 0, employerMatchPct: 0, employerMatchCapPct: 6,
   rothConversionEnabled: false, rothConversionBracket: 0.12,
+  filingStatus: 'single',
 };
 
 const STORAGE_KEY = "retirement_planner_state_v2";
@@ -600,6 +601,7 @@ export default function RetirementPlanner() {
   const [employerMatchCapPct, setEmployerMatchCapPct] = useState(saved.employerMatchCapPct);
   const [rothConversionEnabled, setRothConversionEnabled] = useState(saved.rothConversionEnabled);
   const [rothConversionBracket, setRothConversionBracket] = useState(saved.rothConversionBracket);
+  const [filingStatus, setFilingStatus] = useState(saved.filingStatus ?? 'single');
 
   const [activeTab, setActiveTab] = useState("accounts");
   const [hasError, setHasError] = useState(false);
@@ -618,14 +620,14 @@ export default function RetirementPlanner() {
         inflationRate, birthYear, accounts,
         ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge,
         annualIncome, employerMatchPct, employerMatchCapPct,
-        rothConversionEnabled, rothConversionBracket,
+        rothConversionEnabled, rothConversionBracket, filingStatus,
       }));
     } catch { /* storage unavailable */ }
   }, [retirementAge, lifeExpectancy, annualSpending, withdrawalMode, withdrawalRate,
       inflationRate, birthYear, accounts,
       ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge,
       annualIncome, employerMatchPct, employerMatchCapPct,
-      rothConversionEnabled, rothConversionBracket]);
+      rothConversionEnabled, rothConversionBracket, filingStatus]);
 
   const resetAll = useCallback(() => {
     setRetirementAge(DEFAULTS.retirementAge); setLifeExpectancy(DEFAULTS.lifeExpectancy);
@@ -639,6 +641,7 @@ export default function RetirementPlanner() {
     setEmployerMatchCapPct(DEFAULTS.employerMatchCapPct);
     setRothConversionEnabled(DEFAULTS.rothConversionEnabled);
     setRothConversionBracket(DEFAULTS.rothConversionBracket);
+    setFilingStatus(DEFAULTS.filingStatus);
     setHasError(false); setMcResult(null);
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
   }, []);
@@ -648,8 +651,8 @@ export default function RetirementPlanner() {
     lifeExpectancy: safeLifeExpectancy, annualSpending, withdrawalMode, withdrawalRate,
     inflationRate, ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge, birthYear,
     annualIncome, employerMatchPct, employerMatchCapPct,
-    rothConversionBracket,
-  }), [accounts, safeCurrentAge, safeRetirementAge, safeLifeExpectancy, annualSpending, withdrawalMode, withdrawalRate, inflationRate, ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge, birthYear, annualIncome, employerMatchPct, employerMatchCapPct, rothConversionBracket]);
+    rothConversionBracket, filingStatus,
+  }), [accounts, safeCurrentAge, safeRetirementAge, safeLifeExpectancy, annualSpending, withdrawalMode, withdrawalRate, inflationRate, ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge, birthYear, annualIncome, employerMatchPct, employerMatchCapPct, rothConversionBracket, filingStatus]);
 
   const projection = useMemo(() => {
     try {
@@ -960,6 +963,21 @@ export default function RetirementPlanner() {
                 )}
 
                 <NumberInput label="Inflation Rate" value={inflationRate} onChange={setInflationRate} prefix="" suffix="%" min={0} max={INPUT_LIMITS.inflation.max} step={0.5} ariaLabel="Inflation rate" />
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-2">Filing Status</label>
+                  <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+                    <button onClick={() => setFilingStatus('single')}
+                      className={`flex-1 py-2 text-center transition-colors ${filingStatus === 'single' ? "bg-blue-500 text-white font-medium" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
+                      Single
+                    </button>
+                    <button onClick={() => setFilingStatus('mfj')}
+                      className={`flex-1 py-2 text-center transition-colors ${filingStatus === 'mfj' ? "bg-blue-500 text-white font-medium" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
+                      Married Filing Jointly
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-xs text-gray-400">Affects tax brackets, standard deduction ({filingStatus === 'mfj' ? '$30,000' : '$15,000'} in 2025), and Roth conversion headroom.</p>
+                </div>
 
                 {safeRetirementAge < 59.5 && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700" role="note">
