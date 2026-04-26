@@ -242,28 +242,13 @@ export function runProjection(params) {
     const yearW = { trad401k: 0, roth401k: 0, rothIRA: 0, brokerage: 0 };
     let strategy = null;
 
-    if (isRetired) {
-      const target = withdrawalMode === "rate"
-        ? total * (wRate / 100)
-        : Math.max(0, spending * yearInfl - income);
-      const needed = Math.max(0, withdrawalMode === "rate" ? target - income : target);
-
-      strategy = computeWithdrawalOrder(age, rAge, { ...bal }, birthYear);
-      let rem = needed;
-      for (const { key } of strategy.order) {
-        if (rem <= 0) break;
-        const take = Math.min(rem, Math.max(0, bal[key]));
-        bal[key]    = safeBal(bal[key] - take);
-        yearW[key]  = take;
-        rem -= take;
-      }
-    }
-
-    // Roth conversion (after withdrawals, before tax calc)
+    // Roth conversion runs BEFORE spending withdrawals so that trad401k
+    // spending draws don't eat the bracket headroom.  Baseline = only
+    // fixed income (SS + pension) since spending withdrawals haven't happened yet.
     let conversion = 0, conversionTax = 0, conversionTaxFromBrokerage = 0;
     const inWindow = isRetired && age < rmdAge;
     if (rothConversionEnabled && inWindow && bal.trad401k > 0) {
-      const baseline = yearW.trad401k + penAnnual + 0.85 * ssAnnual;
+      const baseline   = penAnnual + 0.85 * ssAnnual;
       const bracketTop = bracketTopForRate(rothConversionBracket, yrBrackets);
       const headroom   = Math.max(0, bracketTop - baseline);
       conversion = Math.min(headroom, bal.trad401k);
@@ -285,6 +270,23 @@ export function runProjection(params) {
           bal.trad401k  = safeBal(bal.trad401k - conversion);
           bal.rothIRA   = safeBal(bal.rothIRA + Math.max(0, conversion - shortfall));
         }
+      }
+    }
+
+    if (isRetired) {
+      const target = withdrawalMode === "rate"
+        ? total * (wRate / 100)
+        : Math.max(0, spending * yearInfl - income);
+      const needed = Math.max(0, withdrawalMode === "rate" ? target - income : target);
+
+      strategy = computeWithdrawalOrder(age, rAge, { ...bal }, birthYear);
+      let rem = needed;
+      for (const { key } of strategy.order) {
+        if (rem <= 0) break;
+        const take = Math.min(rem, Math.max(0, bal[key]));
+        bal[key]    = safeBal(bal[key] - take);
+        yearW[key]  = take;
+        rem -= take;
       }
     }
 
