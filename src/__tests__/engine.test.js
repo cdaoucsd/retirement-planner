@@ -8,6 +8,7 @@ import {
   runMonteCarlo,
   computeRMD,
   calcLTCGTax, LTCG_BRACKETS_2025,
+  STATE_TAX_2025,
   contributionLimit401k, contributionLimitIRA,
   MARKET_ASSUMPTIONS, allocReturn, allocVol,
   accountStockPct, stockPctAtYear, accountReturnAtYear, accountVolAtYear,
@@ -522,6 +523,113 @@ describe("runProjection — brokerage capital gains", () => {
     expect(y1.capGains).toBeCloseTo(100000, -1);
     // std deduction (15000) shelters first slice; (85000 - 48350) * 0.15 = 5497.5
     expect(y1.ltcgTax).toBeCloseTo(5498, -1);
+  });
+});
+
+// ─── California state tax ──────────────────────────────────────────────────────
+describe("California state tax", () => {
+  it("stateTax 'none' (default) → no state tax charged, existing behavior unchanged", () => {
+    const data = runProjection(baseParams({
+      currentAge: 64, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 100000,
+      accounts: baseAccounts({ trad: { balance: 500000 } }),
+    }));
+    const y1 = data.find(d => d.age === 65);
+    expect(y1.stateTax).toBe(0);
+    expect(y1.stateMarginalRate).toBe(0);
+  });
+
+  it("unknown state key falls back to no state tax", () => {
+    const data = runProjection(baseParams({
+      currentAge: 64, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 100000,
+      accounts: baseAccounts({ trad: { balance: 500000 } }),
+      stateTax: "tx",
+    }));
+    expect(data.find(d => d.age === 65).stateTax).toBe(0);
+  });
+
+  it("CA charges state tax on ordinary (trad401k) withdrawal income", () => {
+    const data = runProjection(baseParams({
+      currentAge: 64, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 100000,
+      accounts: baseAccounts({ trad: { balance: 500000 } }),
+      stateTax: "ca",
+    }));
+    const y1 = data.find(d => d.age === 65);
+    // taxable = 100000 gross - 5540 CA std deduction = 94460, all within the 9.3% bracket tier
+    expect(y1.stateTax).toBeGreaterThan(0);
+    expect(y1.estTax).toBeGreaterThan(
+      runProjection(baseParams({
+        currentAge: 64, retirementAge: 65, lifeExpectancy: 70,
+        withdrawalMode: "fixed", annualSpending: 100000,
+        accounts: baseAccounts({ trad: { balance: 500000 } }),
+      })).find(d => d.age === 65).estTax
+    );
+  });
+
+  it("CA taxes brokerage capital gains as ordinary income even under the federal 0% LTCG ceiling", () => {
+    // gain (~$15,000) exceeds the CA standard deduction ($5,540) but stays
+    // well under the federal 0% LTCG ceiling ($48,350).
+    const data = runProjection(baseParams({
+      currentAge: 64, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 30000,
+      accounts: baseAccounts({ brokerage: { balance: 200000, costBasis: 100000 } }),
+      stateTax: "ca",
+    }));
+    const y1 = data.find(d => d.age === 65);
+    expect(y1.capGains).toBeCloseTo(15000, -1);
+    expect(y1.ltcgTax).toBe(0);          // still 0% federally
+    expect(y1.stateTax).toBeGreaterThan(0); // but CA taxes the gain as ordinary income
+  });
+
+  it("CA standard deduction shelters income below the threshold", () => {
+    const data = runProjection(baseParams({
+      currentAge: 64, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 4000,
+      accounts: baseAccounts({ trad: { balance: 500000 } }),
+      stateTax: "ca",
+    }));
+    expect(data.find(d => d.age === 65).stateTax).toBe(0);
+  });
+
+  it("CA brackets inflate year-over-year like federal brackets", () => {
+    const a = runProjection(baseParams({
+      currentAge: 64, retirementAge: 65, lifeExpectancy: 90,
+      withdrawalMode: "fixed", annualSpending: 100000,
+      inflationRate: 3,
+      accounts: baseAccounts({ trad: { balance: 3_000_000 } }),
+      stateTax: "ca",
+    }));
+    const y1 = a.find(d => d.age === 65).stateTax;
+    const y10 = a.find(d => d.age === 75).stateTax;
+    // withdrawal grows with inflation too, but a higher bracket ceiling means
+    // marginal rate growth should be at most proportional — sanity check tax rises but not explosively
+    expect(y10).toBeGreaterThan(y1);
+  });
+
+  it("Roth conversion cash cost is higher with CA tax than federal-only, but conversion size is unchanged", () => {
+    const scenario = (overrides = {}) => baseParams({
+      currentAge: 59, retirementAge: 60, lifeExpectancy: 90,
+      birthYear: 1965, // rmdAge = 75
+      accounts: baseAccounts({
+        trad: { balance: 1_000_000 },
+        brokerage: { balance: 200_000 },
+      }),
+      rothConversionEnabled: true, rothConversionBracket: 0.12,
+      ...overrides,
+    });
+    const federalOnly = runProjection(scenario());
+    const withCA = runProjection(scenario({ stateTax: "ca" }));
+    const y1Fed = federalOnly.find(d => d.age === 60);
+    const y1CA  = withCA.find(d => d.age === 60);
+    expect(y1CA.conversion).toBeCloseTo(y1Fed.conversion, -1); // sizing is federal-bracket-driven
+    expect(y1CA.conversionTax).toBeGreaterThan(y1Fed.conversionTax); // but costs more
+  });
+
+  it("MFJ CA brackets use doubled thresholds vs single", () => {
+    expect(STATE_TAX_2025.ca.brackets.mfj[0].max).toBeCloseTo(STATE_TAX_2025.ca.brackets.single[0].max * 2, -1);
+    expect(STATE_TAX_2025.ca.standardDeduction.mfj).toBeCloseTo(STATE_TAX_2025.ca.standardDeduction.single * 2, -1);
   });
 });
 

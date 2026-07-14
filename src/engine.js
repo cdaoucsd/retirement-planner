@@ -71,6 +71,41 @@ export const LTCG_BRACKETS_2025 = {
   ],
 };
 
+// California FTB brackets (2024, latest published; used as 2025 estimate pending
+// inflation-adjusted release). CA has no preferential capital-gains rate — gains
+// are taxed as ordinary income. MFJ thresholds are double the single schedule.
+export const STATE_TAX_2025 = {
+  ca: {
+    label: "California",
+    capGainsAsOrdinary: true,
+    standardDeduction: { single: 5540, mfj: 11080 },
+    brackets: {
+      single: [
+        { min: 0,       max: 10756,  rate: 0.01 },
+        { min: 10756,   max: 25499,  rate: 0.02 },
+        { min: 25499,   max: 40245,  rate: 0.04 },
+        { min: 40245,   max: 55866,  rate: 0.06 },
+        { min: 55866,   max: 70606,  rate: 0.08 },
+        { min: 70606,   max: 360659, rate: 0.093 },
+        { min: 360659,  max: 432787, rate: 0.103 },
+        { min: 432787,  max: 721314, rate: 0.113 },
+        { min: 721314,  max: Infinity, rate: 0.123 },
+      ],
+      mfj: [
+        { min: 0,       max: 21512,  rate: 0.01 },
+        { min: 21512,   max: 50998,  rate: 0.02 },
+        { min: 50998,   max: 80490,  rate: 0.04 },
+        { min: 80490,   max: 111732, rate: 0.06 },
+        { min: 111732,  max: 141212, rate: 0.08 },
+        { min: 141212,  max: 721318, rate: 0.093 },
+        { min: 721318,  max: 865574, rate: 0.103 },
+        { min: 865574,  max: 1442628, rate: 0.113 },
+        { min: 1442628, max: Infinity, rate: 0.123 },
+      ],
+    },
+  },
+};
+
 // IRS Uniform Lifetime Table (2022+), Pub 590-B — age → distribution period
 export const UNIFORM_LIFETIME_TABLE = {
   72: 27.4, 73: 26.5, 74: 25.5, 75: 24.6, 76: 23.7, 77: 22.9, 78: 22.0, 79: 21.1,
@@ -338,6 +373,7 @@ export function runProjection(params) {
     annualIncome = 0, employerMatchPct = 0, employerMatchCapPct = 0,
     rothConversionEnabled = false, rothConversionBracket = 0.12,
     filingStatus = 'single',
+    stateTax = 'none',
     marketAssumptions = MARKET_ASSUMPTIONS,
     spendingPhases = null,
   } = params;
@@ -345,6 +381,10 @@ export function runProjection(params) {
   const baseBrackets = filingStatus === 'mfj' ? MFJ_TAX_BRACKETS_2025 : TAX_BRACKETS_2025;
   const stdDed = filingStatus === 'mfj' ? STANDARD_DEDUCTION_2025.mfj : STANDARD_DEDUCTION_2025.single;
   const baseLtcgBrackets = filingStatus === 'mfj' ? LTCG_BRACKETS_2025.mfj : LTCG_BRACKETS_2025.single;
+
+  const stateCfg = STATE_TAX_2025[stateTax] ?? null;
+  const baseStateBrackets = stateCfg ? stateCfg.brackets[filingStatus] : null;
+  const stateStdDed = stateCfg ? stateCfg.standardDeduction[filingStatus] : 0;
 
   const cAge = clamp(currentAge, 18, 100);
   const rAge = clamp(retirementAge, cAge + 1, 100);
@@ -400,6 +440,8 @@ export function runProjection(params) {
     const yearInfl      = Math.pow(1 + infRate / 100, age - cAge);
     const yrBrackets    = inflatedBrackets(yearInfl, baseBrackets);
     const stdDedInflated = stdDed * yearInfl;
+    const yrStateBrackets = stateCfg ? inflatedBrackets(yearInfl, baseStateBrackets) : null;
+    const stateStdDedInflated = stateStdDed * yearInfl;
 
     for (const k of ACCT_KEYS) {
       const mr = getR(accounts[k], age - cAge) / 12;
@@ -450,6 +492,16 @@ export function runProjection(params) {
           0,
           calcTax(taxableWithConv, yrBrackets) - calcTax(taxableBaseline, yrBrackets)
         );
+        if (stateCfg) {
+          // CA taxes the conversion as ordinary income too; sized against the
+          // federal bracket target (headroom above), but the cash cost includes both.
+          const stateTaxableWithConv = Math.max(0, baseline + conversion - stateStdDedInflated);
+          const stateTaxableBaseline = Math.max(0, baseline - stateStdDedInflated);
+          conversionTax += Math.max(
+            0,
+            calcTax(stateTaxableWithConv, yrStateBrackets) - calcTax(stateTaxableBaseline, yrStateBrackets)
+          );
+        }
         const rothIRABefore = bal.rothIRA;
         // Pay tax: brokerage first (realizing gains), fallback net from conversion
         const { take: paidFromBrokerage, gain: convGain } = sellBrokerage(conversionTax);
@@ -564,6 +616,15 @@ export function runProjection(params) {
     const taxableGains  = Math.max(0, realizedGains - leftoverDed);
     const yrLtcgBrackets = inflatedBrackets(yearInfl, baseLtcgBrackets);
     const ltcgTax = calcLTCGTax(taxableGains, taxableInc, yrLtcgBrackets);
+
+    // CA (and any future capGainsAsOrdinary state) taxes realized gains as
+    // ordinary income — no separate LTCG schedule, so they stack on grossInc.
+    const stateTaxableInc = stateCfg
+      ? Math.max(0, grossInc + realizedGains - stateStdDedInflated)
+      : 0;
+    const stateTax = stateCfg ? calcTax(stateTaxableInc, yrStateBrackets) : 0;
+    const stateMarginalRate = stateCfg ? getMarginalRate(stateTaxableInc, yrStateBrackets) : 0;
+
     data.push({
       age,
       trad401k:  Math.max(0, Math.round(safeBal(bal.trad401k))),
@@ -587,8 +648,10 @@ export function runProjection(params) {
       capGains:    Math.round(realizedGains),
       ltcgTax:     Math.round(ltcgTax),
       brokerageBasis: Math.round(brokerageBasis),
-      estTax:    Math.round(calcTax(taxableInc, yrBrackets) + ltcgTax),
+      estTax:    Math.round(calcTax(taxableInc, yrBrackets) + ltcgTax + stateTax),
       marginalRate: getMarginalRate(taxableInc, yrBrackets),
+      stateTax:     Math.round(stateTax),
+      stateMarginalRate,
       // Basis / breakdown fields
       trad401kContribBasis: Math.round(trad401kContribBasis),
       trad401kMatchBasis:   Math.round(trad401kMatchBasis),

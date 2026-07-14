@@ -7,7 +7,7 @@ const AXIS_TICK = { fontSize: 11, fill: "#7C8A85", fontFamily: '"IBM Plex Mono",
 export default function RothConversionPanel({
   enabled, onToggleEnabled,
   bracket, onChangeBracket,
-  projection, projectionNoConv, retirementAge, birthYear,
+  projection, projectionNoConv, retirementAge, birthYear, stateTax = 'none',
 }) {
   const rmdAge = birthYear <= 1959 ? 73 : 75;
   const window = projection.filter(d => d.age >= retirementAge && d.age < rmdAge);
@@ -157,7 +157,7 @@ export default function RothConversionPanel({
               <li><em>Account rule</em>: Roth IRA earnings are tax-free only after the <em>account</em> has been open 5 years. Open one with $1 today even if you don't plan to use it soon.</li>
             </ul>
           </div>
-          <p className="text-haze italic">This calculator models federal income tax only, with brackets inflating at your inflation rate. Actual brackets and laws change — consult a CPA or fee-only fiduciary advisor before executing a multi-year conversion strategy.</p>
+          <p className="text-haze italic">This calculator models federal{stateTax === 'ca' ? ' and California' : ''} income tax{stateTax === 'ca' ? '' : ' only'}, with brackets inflating at your inflation rate. Conversion sizing targets the federal bracket selected above; the tax cost shown includes any state tax due. Actual brackets and laws change — consult a CPA or fee-only fiduciary advisor before executing a multi-year conversion strategy.</p>
         </div>
       </details>
     </div>

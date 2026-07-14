@@ -3,7 +3,7 @@ import { ACCT_COLORS, ACCT_LABELS, MILESTONE_AGES, safeNum } from "../engine.js"
 import { fmtFull } from "../format.js";
 
 // ─── Withdrawal Strategy Panel ────────────────────────────────────────────────
-export function WithdrawalStrategyPanel({ projection, retirementAge, birthYear }) {
+export function WithdrawalStrategyPanel({ projection, retirementAge, birthYear, stateTax = 'none' }) {
   const [selectedAge, setSelectedAge] = useState(retirementAge);
   const retiredData = projection.filter(d => d.age >= retirementAge);
   const selected    = projection.find(d => d.age === selectedAge) || retiredData[0];
@@ -111,9 +111,12 @@ export function WithdrawalStrategyPanel({ projection, retirementAge, birthYear }
                 </div>
               )}
               {selected?.estTax > 0 && (
-                <div className="flex justify-between text-xs"><span className="text-haze">Est. Federal Tax (incl. cap gains)</span><span className="font-medium font-mono tnum">{fmtFull(selected.estTax)}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-haze">{stateTax === 'ca' ? 'Est. Federal + CA Tax (incl. cap gains)' : 'Est. Federal Tax (incl. cap gains)'}</span><span className="font-medium font-mono tnum">{fmtFull(selected.estTax)}</span></div>
               )}
-              <div className="flex justify-between text-xs"><span className="text-haze">Marginal Rate</span><span className="font-medium font-mono tnum">{(safeNum(selected.marginalRate) * 100).toFixed(0)}%</span></div>
+              <div className="flex justify-between text-xs"><span className="text-haze">Federal Marginal Rate</span><span className="font-medium font-mono tnum">{(safeNum(selected.marginalRate) * 100).toFixed(0)}%</span></div>
+              {stateTax === 'ca' && (
+                <div className="flex justify-between text-xs"><span className="text-haze">CA Marginal Rate</span><span className="font-medium font-mono tnum">{(safeNum(selected.stateMarginalRate) * 100).toFixed(1)}%</span></div>
+              )}
             </div>
           )}
         </>

@@ -59,6 +59,7 @@ const DEFAULTS = {
   annualIncome: 0, employerMatchPct: 0, employerMatchCapPct: 6,
   rothConversionEnabled: false, rothConversionBracket: 0.12,
   filingStatus: 'single',
+  stateTax: 'none',
   marketAssumptions: { ...MARKET_ASSUMPTIONS },
   spendingPhases: { enabled: false, slowGoAge: 75, slowGoPct: 85, noGoAge: 85, noGoPct: 75 },
 };
@@ -119,6 +120,7 @@ export default function RetirementPlanner() {
   const [rothConversionEnabled, setRothConversionEnabled] = useState(saved.rothConversionEnabled);
   const [rothConversionBracket, setRothConversionBracket] = useState(saved.rothConversionBracket);
   const [filingStatus, setFilingStatus] = useState(saved.filingStatus ?? 'single');
+  const [stateTax, setStateTax] = useState(saved.stateTax ?? 'none');
   const [marketAssumptions, setMarketAssumptions] = useState(saved.marketAssumptions ?? { ...MARKET_ASSUMPTIONS });
   const [spendingPhases, setSpendingPhases] = useState(saved.spendingPhases ?? DEFAULTS.spendingPhases);
 
@@ -138,14 +140,14 @@ export default function RetirementPlanner() {
         inflationRate, birthYear, accounts,
         ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge,
         annualIncome, employerMatchPct, employerMatchCapPct,
-        rothConversionEnabled, rothConversionBracket, filingStatus, marketAssumptions, spendingPhases,
+        rothConversionEnabled, rothConversionBracket, filingStatus, stateTax, marketAssumptions, spendingPhases,
       }));
     } catch { /* storage unavailable */ }
   }, [retirementAge, lifeExpectancy, annualSpending, withdrawalMode, withdrawalRate,
       inflationRate, birthYear, accounts,
       ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge,
       annualIncome, employerMatchPct, employerMatchCapPct,
-      rothConversionEnabled, rothConversionBracket, filingStatus, marketAssumptions, spendingPhases]);
+      rothConversionEnabled, rothConversionBracket, filingStatus, stateTax, marketAssumptions, spendingPhases]);
 
   const resetAll = useCallback(() => {
     setRetirementAge(DEFAULTS.retirementAge); setLifeExpectancy(DEFAULTS.lifeExpectancy);
@@ -160,6 +162,7 @@ export default function RetirementPlanner() {
     setRothConversionEnabled(DEFAULTS.rothConversionEnabled);
     setRothConversionBracket(DEFAULTS.rothConversionBracket);
     setFilingStatus(DEFAULTS.filingStatus);
+    setStateTax(DEFAULTS.stateTax);
     setMarketAssumptions({ ...MARKET_ASSUMPTIONS });
     setSpendingPhases(DEFAULTS.spendingPhases);
     setMcResult(null);
@@ -171,8 +174,8 @@ export default function RetirementPlanner() {
     lifeExpectancy: safeLifeExpectancy, annualSpending, withdrawalMode, withdrawalRate,
     inflationRate, ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge, birthYear,
     annualIncome, employerMatchPct, employerMatchCapPct,
-    rothConversionBracket, filingStatus, marketAssumptions, spendingPhases,
-  }), [accounts, safeCurrentAge, safeRetirementAge, safeLifeExpectancy, annualSpending, withdrawalMode, withdrawalRate, inflationRate, ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge, birthYear, annualIncome, employerMatchPct, employerMatchCapPct, rothConversionBracket, filingStatus, marketAssumptions, spendingPhases]);
+    rothConversionBracket, filingStatus, stateTax, marketAssumptions, spendingPhases,
+  }), [accounts, safeCurrentAge, safeRetirementAge, safeLifeExpectancy, annualSpending, withdrawalMode, withdrawalRate, inflationRate, ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge, birthYear, annualIncome, employerMatchPct, employerMatchCapPct, rothConversionBracket, filingStatus, stateTax, marketAssumptions, spendingPhases]);
 
   const projectionResult = useMemo(() => {
     try {
@@ -291,7 +294,7 @@ export default function RetirementPlanner() {
         </header>
 
         <Card className="p-4 mb-6" >
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end" role="group" aria-label="Your profile">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 items-end" role="group" aria-label="Your profile">
             <NumberInput label="Birth Year" value={birthYear} onChange={setBirthYear} prefix="" min={INPUT_LIMITS.birthYear.min} max={INPUT_LIMITS.birthYear.max} small ariaLabel="Birth year" />
             <NumberInput label="Retire At" value={retirementAge} onChange={setRetirementAge} prefix="" min={safeCurrentAge + 1} max={100} small ariaLabel="Retirement age" />
             <NumberInput label="Plan To Age" value={lifeExpectancy} onChange={setLifeExpectancy} prefix="" min={safeRetirementAge + 1} max={110} small ariaLabel="Life expectancy" />
@@ -299,6 +302,11 @@ export default function RetirementPlanner() {
               <label className="block text-xs font-medium text-haze mb-1">Filing Status</label>
               <Segmented ariaLabel="Filing status" value={filingStatus} onChange={setFilingStatus}
                 options={[["single", "Single"], ["mfj", "MFJ"]]} />
+            </div>
+            <div className="col-span-2 md:col-span-1">
+              <label className="block text-xs font-medium text-haze mb-1">State Tax</label>
+              <Segmented ariaLabel="State tax" value={stateTax} onChange={setStateTax}
+                options={[["none", "None"], ["ca", "California"]]} />
             </div>
             <div className="text-xs text-haze pb-2">
               Age <span className="font-mono tnum font-semibold text-ink">{safeCurrentAge}</span> today ·{" "}
@@ -548,7 +556,7 @@ export default function RetirementPlanner() {
         )}
 
         <div className="grid md:grid-cols-2 gap-4 mb-4">
-          <WithdrawalStrategyPanel projection={projection} retirementAge={safeRetirementAge} birthYear={birthYear} />
+          <WithdrawalStrategyPanel projection={projection} retirementAge={safeRetirementAge} birthYear={birthYear} stateTax={stateTax} />
           <MilestoneTimeline currentAge={safeCurrentAge} retirementAge={safeRetirementAge} birthYear={birthYear} />
         </div>
 
@@ -562,6 +570,7 @@ export default function RetirementPlanner() {
             projectionNoConv={projectionNoConv}
             retirementAge={safeRetirementAge}
             birthYear={birthYear}
+            stateTax={stateTax}
           />
         </div>
 
@@ -601,7 +610,7 @@ export default function RetirementPlanner() {
         </Card>
 
         <footer className="text-center text-xs text-haze mt-8 mb-4">
-          <p>Simplified projection tool. Federal income and capital-gains tax estimated with 2025 brackets ({filingStatus === 'mfj' ? 'married filing jointly' : 'single filer'}), inflated annually. RMDs per the IRS Uniform Lifetime Table. Monte Carlo uses a normal return distribution. Consult a financial advisor for personalised advice.</p>
+          <p>Simplified projection tool. Federal income and capital-gains tax estimated with 2025 brackets ({filingStatus === 'mfj' ? 'married filing jointly' : 'single filer'}), inflated annually.{stateTax === 'ca' ? ' California state tax estimated with 2024 FTB brackets (CA taxes capital gains as ordinary income).' : ''} RMDs per the IRS Uniform Lifetime Table. Monte Carlo uses a normal return distribution. Consult a financial advisor for personalised advice.</p>
           <p className="mt-1">All calculations run client-side. No financial data is sent to any server.</p>
         </footer>
       </div>
