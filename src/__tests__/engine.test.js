@@ -6,6 +6,12 @@ import {
   computeWithdrawalOrder,
   runProjection,
   runMonteCarlo,
+  computeRMD,
+  calcLTCGTax, LTCG_BRACKETS_2025,
+  contributionLimit401k, contributionLimitIRA,
+  MARKET_ASSUMPTIONS, allocReturn, allocVol,
+  accountStockPct, stockPctAtYear, accountReturnAtYear, accountVolAtYear,
+  ssClaimFactor, ssBreakEvenAge, spendingMultiplier,
 } from "../engine.js";
 
 const ACC = (overrides = {}) => ({ balance: 0, monthly: 0, returnPreset: 0, customReturn: 7, ...overrides });
@@ -398,5 +404,257 @@ describe("Edge cases", () => {
     expect(r.successRate).toBeGreaterThanOrEqual(0);
     expect(r.successRate).toBeLessThanOrEqual(100);
     expect(r.fanData.length).toBe(85 - 65 + 1);
+  });
+});
+
+// ─── RMDs (Uniform Lifetime Table) ────────────────────────────────────────────
+describe("computeRMD", () => {
+  it("age 75 uses divisor 24.6", () => {
+    expect(computeRMD(246000, 75)).toBeCloseTo(10000, 0);
+  });
+  it("age 73 uses divisor 26.5", () => {
+    expect(computeRMD(265000, 73)).toBeCloseTo(10000, 0);
+  });
+  it("returns 0 below table start age", () => {
+    expect(computeRMD(100000, 70)).toBe(0);
+  });
+  it("returns 0 for zero or negative balance", () => {
+    expect(computeRMD(0, 80)).toBe(0);
+    expect(computeRMD(-100, 80)).toBe(0);
+  });
+  it("ages past 110 use the final divisor (3.5)", () => {
+    expect(computeRMD(35000, 115)).toBeCloseTo(10000, 0);
+  });
+});
+
+describe("runProjection — forced RMDs", () => {
+  const rmdScenario = (overrides = {}) => baseParams({
+    currentAge: 71, retirementAge: 72, lifeExpectancy: 80,
+    birthYear: 1955, // rmdAge = 73
+    withdrawalMode: "fixed", annualSpending: 0,
+    accounts: baseAccounts({ trad: { balance: 265000 } }),
+    ...overrides,
+  });
+
+  it("no RMD before rmdAge", () => {
+    const data = runProjection(rmdScenario());
+    expect(data.find(d => d.age === 72).rmdRequired).toBe(0);
+  });
+
+  it("forces RMD at rmdAge even with zero spending; excess reinvested to brokerage", () => {
+    const data = runProjection(rmdScenario());
+    const y = data.find(d => d.age === 73);
+    expect(y.rmdRequired).toBeCloseTo(10000, -1); // 265000 / 26.5
+    expect(y.wTrad401k).toBeCloseTo(10000, -1);
+    expect(y.trad401k).toBeCloseTo(255000, -1);
+    expect(y.brokerage).toBeCloseTo(10000, -1);
+  });
+
+  it("spending below RMD → full RMD withdrawn, only excess reinvested", () => {
+    const data = runProjection(rmdScenario({ annualSpending: 6000 }));
+    const y = data.find(d => d.age === 73);
+    // age-72 spending already drew $6K → balance 259000, RMD = 259000/26.5 ≈ 9774
+    expect(y.wTrad401k).toBeCloseTo(9774, -1);
+    expect(y.brokerage).toBeCloseTo(9774 - 6000, -1);
+  });
+
+  it("spending above RMD → strategy tops up beyond the RMD", () => {
+    const data = runProjection(rmdScenario({ annualSpending: 30000 }));
+    const y = data.find(d => d.age === 73);
+    expect(y.wTrad401k).toBeCloseTo(30000, -1);
+    expect(y.brokerage).toBeCloseTo(0, -1);
+  });
+
+  it("birthYear 1965 → no RMD until 75", () => {
+    const data = runProjection(rmdScenario({ birthYear: 1965, lifeExpectancy: 80 }));
+    expect(data.find(d => d.age === 73).rmdRequired).toBe(0);
+    expect(data.find(d => d.age === 74).rmdRequired).toBe(0);
+    expect(data.find(d => d.age === 75).rmdRequired).toBeGreaterThan(0);
+  });
+});
+
+// ─── Capital gains (brokerage) ────────────────────────────────────────────────
+describe("calcLTCGTax", () => {
+  it("gains inside the 0% bracket are untaxed", () => {
+    expect(calcLTCGTax(10000, 0, LTCG_BRACKETS_2025.single)).toBe(0);
+  });
+  it("gains stack on top of ordinary income", () => {
+    // ordinary 40000; 0% bracket ends at 48350 → first 8350 of gains free, rest at 15%
+    expect(calcLTCGTax(100000, 40000, LTCG_BRACKETS_2025.single))
+      .toBeCloseTo((100000 - 8350) * 0.15, 0);
+  });
+  it("high income → 20% rate", () => {
+    expect(calcLTCGTax(100000, 600000, LTCG_BRACKETS_2025.single)).toBeCloseTo(20000, 0);
+  });
+  it("MFJ 0% bracket is wider", () => {
+    expect(calcLTCGTax(90000, 0, LTCG_BRACKETS_2025.mfj)).toBe(0);
+  });
+});
+
+describe("runProjection — brokerage capital gains", () => {
+  it("withdrawals realize pro-rata gains against cost basis", () => {
+    const data = runProjection(baseParams({
+      currentAge: 64, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 10000,
+      accounts: baseAccounts({ brokerage: { balance: 100000, costBasis: 50000 } }),
+    }));
+    const y1 = data.find(d => d.age === 65);
+    expect(y1.capGains).toBeCloseTo(5000, -1); // half of each dollar is gain
+    expect(y1.ltcgTax).toBe(0);                // inside 0% bracket
+  });
+
+  it("costBasis defaults to balance → zero gains", () => {
+    const data = runProjection(baseParams({
+      currentAge: 64, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 10000,
+      accounts: baseAccounts({ brokerage: { balance: 100000 } }),
+    }));
+    expect(data.find(d => d.age === 65).capGains).toBeCloseTo(0, -1);
+  });
+
+  it("large all-gain withdrawal is taxed at LTCG rates above the 0% ceiling", () => {
+    const data = runProjection(baseParams({
+      currentAge: 64, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 100000,
+      accounts: baseAccounts({ brokerage: { balance: 2000000, costBasis: 0 } }),
+    }));
+    const y1 = data.find(d => d.age === 65);
+    expect(y1.capGains).toBeCloseTo(100000, -1);
+    // std deduction (15000) shelters first slice; (85000 - 48350) * 0.15 = 5497.5
+    expect(y1.ltcgTax).toBeCloseTo(5498, -1);
+  });
+});
+
+// ─── Asset allocation & glide path ────────────────────────────────────────────
+describe("allocation model", () => {
+  it("allocReturn blends stock/bond expected returns (60/40 → 7.5%)", () => {
+    expect(allocReturn(60)).toBeCloseTo(0.075, 4);
+    expect(allocReturn(100)).toBeCloseTo(MARKET_ASSUMPTIONS.stockReturn / 100, 4);
+    expect(allocReturn(0)).toBeCloseTo(MARKET_ASSUMPTIONS.bondReturn / 100, 4);
+  });
+
+  it("allocVol blends stock/bond volatility (60/40 → 12.4%)", () => {
+    expect(allocVol(60)).toBeCloseTo(0.124, 4);
+  });
+
+  it("presets map to stock allocations (30/60/90), custom-alloc uses stockPct, custom-return is null", () => {
+    expect(accountStockPct({ returnPreset: 0 })).toBe(30);
+    expect(accountStockPct({ returnPreset: 1 })).toBe(60);
+    expect(accountStockPct({ returnPreset: 2 })).toBe(90);
+    expect(accountStockPct({ returnPreset: 3, customMode: "alloc", stockPct: 45 })).toBe(45);
+    expect(accountStockPct({ returnPreset: 3, customReturn: 7 })).toBe(null);
+  });
+
+  it("glide path de-risks 1 stock-pt per year down to the floor", () => {
+    const acc = { returnPreset: 2, glide: true, glideFloor: 40 };
+    expect(stockPctAtYear(acc, 0)).toBe(90);
+    expect(stockPctAtYear(acc, 10)).toBe(80);
+    expect(stockPctAtYear(acc, 60)).toBe(40); // clamped at floor
+  });
+
+  it("no glide → allocation constant across years", () => {
+    const acc = { returnPreset: 2, glide: false };
+    expect(stockPctAtYear(acc, 30)).toBe(90);
+  });
+
+  it("raw-return custom accounts ignore glide and market assumptions", () => {
+    const acc = { returnPreset: 3, customReturn: 5, glide: true };
+    expect(accountReturnAtYear(acc, 0)).toBeCloseTo(0.05, 6);
+    expect(accountReturnAtYear(acc, 20)).toBeCloseTo(0.05, 6);
+  });
+
+  it("accountVolAtYear reflects allocation", () => {
+    expect(accountVolAtYear({ returnPreset: 0 }, 0)).toBeCloseTo(allocVol(30), 6);
+    expect(accountVolAtYear({ returnPreset: 2, glide: true, glideFloor: 30 }, 60)).toBeCloseTo(allocVol(30), 6);
+  });
+
+  it("projection: glide path grows slower than fixed aggressive allocation", () => {
+    const mk = (glide) => baseParams({
+      currentAge: 55, retirementAge: 75, lifeExpectancy: 80,
+      accounts: baseAccounts({ trad: { balance: 100000, returnPreset: 2, glide, glideFloor: 20 } }),
+    });
+    const fixed = runProjection(mk(false)).find(d => d.age === 75).trad401k;
+    const glided = runProjection(mk(true)).find(d => d.age === 75).trad401k;
+    expect(glided).toBeLessThan(fixed);
+    expect(glided).toBeGreaterThan(100000); // still grows
+  });
+
+  it("Monte Carlo accepts currentAge and per-year allocation (still valid rates)", () => {
+    const r = runMonteCarlo({
+      accounts: baseAccounts({ trad: { balance: 500000, returnPreset: 1, glide: true, glideFloor: 30 } }),
+      retirementBalance: { trad401k: 500000, roth401k: 0, rothIRA: 0, brokerage: 0 },
+      currentAge: 55, retirementAge: 65, lifeExpectancy: 85,
+      annualSpending: 30000, withdrawalMode: "fixed", withdrawalRate: 4,
+      inflationRate: 0,
+      ssEnabled: false, ssMonthly: 0, ssStartAge: 67,
+      pensionEnabled: false, pensionMonthly: 0, pensionStartAge: 65,
+    });
+    expect(r.successRate).toBeGreaterThanOrEqual(0);
+    expect(r.successRate).toBeLessThanOrEqual(100);
+    expect(r.blendedMean).toBeGreaterThan(0);
+    expect(r.blendedVol).toBeGreaterThan(0);
+  });
+});
+
+// ─── Social Security claiming ─────────────────────────────────────────────────
+describe("ssClaimFactor", () => {
+  it("matches SSA schedule vs FRA 67", () => {
+    expect(ssClaimFactor(62)).toBeCloseTo(0.70, 3);
+    expect(ssClaimFactor(65)).toBeCloseTo(0.8667, 3);
+    expect(ssClaimFactor(67)).toBe(1);
+    expect(ssClaimFactor(70)).toBeCloseTo(1.24, 3);
+  });
+  it("clamps outside 62–70", () => {
+    expect(ssClaimFactor(55)).toBeCloseTo(0.70, 3);
+    expect(ssClaimFactor(80)).toBeCloseTo(1.24, 3);
+  });
+});
+
+describe("ssBreakEvenAge", () => {
+  it("62 vs 67 breaks even near 78.7", () => {
+    expect(ssBreakEvenAge(62, 67)).toBeCloseTo(78.67, 1);
+  });
+  it("67 vs 70 breaks even near 82.5", () => {
+    expect(ssBreakEvenAge(67, 70)).toBeCloseTo(82.5, 1);
+  });
+});
+
+// ─── Spending phases ──────────────────────────────────────────────────────────
+describe("spending phases", () => {
+  const phases = { enabled: true, slowGoAge: 75, slowGoPct: 50, noGoAge: 85, noGoPct: 25 };
+
+  it("multiplier bands: 1 / slow-go / no-go", () => {
+    expect(spendingMultiplier(70, phases)).toBe(1);
+    expect(spendingMultiplier(75, phases)).toBe(0.5);
+    expect(spendingMultiplier(84, phases)).toBe(0.5);
+    expect(spendingMultiplier(85, phases)).toBe(0.25);
+    expect(spendingMultiplier(85, { ...phases, enabled: false })).toBe(1);
+    expect(spendingMultiplier(85, null)).toBe(1);
+  });
+
+  it("projection applies phase multipliers to fixed spending", () => {
+    const data = runProjection(baseParams({
+      currentAge: 64, retirementAge: 65, lifeExpectancy: 90,
+      withdrawalMode: "fixed", annualSpending: 40000,
+      accounts: baseAccounts({ brokerage: { balance: 2_000_000 } }), // no trad → no RMD noise
+      spendingPhases: phases,
+    }));
+    expect(data.find(d => d.age === 74).wTotal).toBeCloseTo(40000, -1);
+    expect(data.find(d => d.age === 75).wTotal).toBeCloseTo(20000, -1);
+    expect(data.find(d => d.age === 85).wTotal).toBeCloseTo(10000, -1);
+  });
+});
+
+// ─── Contribution limits ──────────────────────────────────────────────────────
+describe("contribution limits (2025)", () => {
+  it("401(k): base / 50+ catch-up / 60–63 super catch-up", () => {
+    expect(contributionLimit401k(49)).toBe(23500);
+    expect(contributionLimit401k(50)).toBe(31000);
+    expect(contributionLimit401k(61)).toBe(34750);
+    expect(contributionLimit401k(64)).toBe(31000);
+  });
+  it("IRA: base / 50+ catch-up", () => {
+    expect(contributionLimitIRA(49)).toBe(7000);
+    expect(contributionLimitIRA(50)).toBe(8000);
   });
 });
