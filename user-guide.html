@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Retirement Planner — User Guide</title>
+  <style>
+    /* ── Base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      font-size: 11pt;
+      line-height: 1.65;
+      color: #1e293b;
+      background: #fff;
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 40px 48px;
+    }
+
+    /* ── Typography ───────────────────────────────────────── */
+    h1 { font-size: 28pt; font-weight: 700; color: #1e3a8a; margin-bottom: 4px; }
+    h2 { font-size: 16pt; font-weight: 700; color: #1e3a8a; margin-top: 36px; margin-bottom: 10px;
+         padding-bottom: 6px; border-bottom: 2px solid #dbeafe; }
+    h3 { font-size: 12pt; font-weight: 600; color: #1e40af; margin-top: 20px; margin-bottom: 6px; }
+    h4 { font-size: 10.5pt; font-weight: 600; color: #374151; margin-top: 14px; margin-bottom: 4px; }
+    p  { margin-bottom: 8px; }
+
+    ul, ol { margin: 6px 0 8px 22px; }
+    li { margin-bottom: 4px; }
+
+    strong { color: #111827; }
+    em     { color: #4b5563; }
+
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Cover ────────────────────────────────────────────── */
+    .cover {
+      text-align: center;
+      padding: 60px 0 50px;
+      border-bottom: 3px solid #dbeafe;
+      margin-bottom: 40px;
+    }
+    .cover .badge {
+      display: inline-block;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 9pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 18px;
+    }
+    .cover h1 { font-size: 34pt; margin-bottom: 12px; }
+    .cover .subtitle {
+      font-size: 13pt;
+      color: #64748b;
+      max-width: 480px;
+      margin: 0 auto 24px;
+    }
+    .cover .meta { font-size: 9pt; color: #94a3b8; }
+
+    /* ── Callout boxes ─────────────────────────────────────── */
+    .callout {
+      border-left: 4px solid;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin: 14px 0;
+      font-size: 10.5pt;
+    }
+    .callout.blue  { background: #eff6ff; border-color: #3b82f6; color: #1e3a8a; }
+    .callout.green { background: #f0fdf4; border-color: #22c55e; color: #14532d; }
+    .callout.amber { background: #fffbeb; border-color: #f59e0b; color: #78350f; }
+    .callout.red   { background: #fff1f2; border-color: #f43f5e; color: #881337; }
+    .callout.purple{ background: #faf5ff; border-color: #a855f7; color: #4c1d95; }
+    .callout strong { color: inherit; }
+
+    /* ── Table ─────────────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 16px;
+      font-size: 10pt;
+    }
+    thead tr { background: #f1f5f9; }
+    th {
+      text-align: left;
+      padding: 7px 10px;
+      font-weight: 600;
+      color: #374151;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: #f8fafc; }
+
+    /* ── Step list ─────────────────────────────────────────── */
+    .steps { list-style: none; margin: 10px 0; padding: 0; }
+    .steps li {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      align-items: flex-start;
+    }
+    .steps .num {
+      flex-shrink: 0;
+      width: 22px; height: 22px;
+      background: #2563eb;
+      color: #fff;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 22px;
+      font-size: 9pt;
+      font-weight: 700;
+      margin-top: 1px;
+    }
+
+    /* ── Tag chips ─────────────────────────────────────────── */
+    .chip {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 10px;
+      font-size: 9pt;
+      font-weight: 600;
+    }
+    .chip.blue   { background: #dbeafe; color: #1d4ed8; }
+    .chip.teal   { background: #ccfbf1; color: #0f766e; }
+    .chip.green  { background: #dcfce7; color: #15803d; }
+    .chip.purple { background: #f3e8ff; color: #7e22ce; }
+    .chip.amber  { background: #fef3c7; color: #b45309; }
+    .chip.red    { background: #ffe4e6; color: #be123c; }
+
+    /* ── Horizontal rule ───────────────────────────────────── */
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 28px 0; }
+
+    /* ── Two-column layout ─────────────────────────────────── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 10px 0; }
+
+    /* ── Account color dots ─────────────────────────────────── */
+    .dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+
+    /* ── Print ─────────────────────────────────────────────── */
+    @media print {
+      body { padding: 24px 32px; }
+      h2 { page-break-before: always; padding-top: 8px; }
+      h2:first-of-type { page-break-before: avoid; }
+      .cover { page-break-after: always; }
+      .no-break { page-break-inside: avoid; }
+      a { color: inherit; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     COVER PAGE
+═══════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="badge">User Guide</div>
+  <h1>Retirement Planner</h1>
+  <p class="subtitle">Model your path to financial independence with tax-optimized withdrawal strategies</p>
+  <p class="meta">Version 2 &nbsp;·&nbsp; cdaoucsd.github.io/retirement-planner</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     TABLE OF CONTENTS
+═══════════════════════════════════════════════════════════ -->
+<h2 style="page-break-before:avoid">Table of Contents</h2>
+<ol>
+  <li><a href="#overview">Overview &amp; Quick Start</a></li>
+  <li><a href="#accounts">Accounts Tab</a></li>
+  <li><a href="#income">Income Tab</a></li>
+  <li><a href="#strategy">Withdrawal Strategy Tab</a></li>
+  <li><a href="#conversion">Roth Conversion Tab</a></li>
+  <li><a href="#montecarlo">Monte Carlo Tab</a></li>
+  <li><a href="#settings">Settings Tab</a></li>
+  <li><a href="#chart">Understanding the Charts</a></li>
+  <li><a href="#milestones">Key Retirement Milestones</a></li>
+  <li><a href="#tax">Tax Concepts Explained</a></li>
+  <li><a href="#faq">Common Questions &amp; Scenarios</a></li>
+</ol>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════
+     1. OVERVIEW
+═══════════════════════════════════════════════════════════ -->
+<h2 id="overview">1. Overview &amp; Quick Start</h2>
+
+<p>This planner projects your retirement portfolio from today until your life expectancy. It models four account types, Social Security, a pension, employer matching, Roth conversions, and withdrawal taxes — all updated in real time as you change inputs.</p>
+
+<div class="callout blue">
+  <strong>Your data stays private.</strong> Everything is stored in your browser's local storage. Nothing is sent to any server.
+</div>
+
+<h3>Quick Start (5 minutes)</h3>
+<ol class="steps">
+  <li><span class="num">1</span><span>Enter your <strong>birth year</strong> in Settings so the planner knows your current age.</span></li>
+  <li><span class="num">2</span><span>Go to <strong>Accounts</strong> and fill in current balances and monthly contributions for each account you own.</span></li>
+  <li><span class="num">3</span><span>Go to <strong>Income</strong> and add Social Security, pension, and employer match details.</span></li>
+  <li><span class="num">4</span><span>Go to <strong>Withdrawal Strategy</strong> and set your target retirement age and annual spending.</span></li>
+  <li><span class="num">5</span><span>Read the blue <em>Portfolio Projection</em> chart at the top — does your money last to your life expectancy?</span></li>
+</ol>
+
+<h3>Summary Stats (top of page)</h3>
+<table>
+  <thead><tr><th>Stat</th><th>What It Means</th></tr></thead>
+  <tbody>
+    <tr><td><strong>At Retirement</strong></td><td>Total portfolio value the year you retire</td></tr>
+    <tr><td><strong>Peak Portfolio</strong></td><td>Highest total value reached and the age it occurs</td></tr>
+    <tr><td><strong>At Age X</strong></td><td>Projected value at your life expectancy; shown in red if it reaches $0</td></tr>
+    <tr><td><strong>Monthly Contributions</strong></td><td>Sum of all your current monthly contributions across all accounts</td></tr>
+  </tbody>
+</table>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════
+     2. ACCOUNTS
+═══════════════════════════════════════════════════════════ -->
+<h2 id="accounts">2. Accounts Tab</h2>
+
+<p>Each account card has three inputs and a return selector. Changes update the projection immediately.</p>
+
+<div class="two-col">
+  <div>
+    <h4><span class="dot" style="background:#2563eb"></span>Traditional 401(k)</h4>
+    <ul>
+      <li><strong>Pre-tax</strong> contributions; all withdrawals taxed as ordinary income</li>
+      <li>Employer match is added here (configured in the Income tab)</li>
+      <li>Subject to Required Minimum Distributions (RMDs) at age 73 or 75</li>
+      <li><em>At Retirement</em> breakdown shows: your contributions / employer match / total growth</li>
+    </ul>
+  </div>
+  <div>
+    <h4><span class="dot" style="background:#0d9488"></span>Roth 401(k)</h4>
+    <ul>
+      <li><strong>After-tax</strong> contributions; qualified withdrawals are tax-free</li>
+      <li>Before age 59½, withdrawals follow the <em>pro-rata rule</em> — contributions and earnings come out proportionally</li>
+      <li>Set the <em>Contribution Basis</em> to track how much of your current balance is contributions (post-tax principal)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="two-col">
+  <div>
+    <h4><span class="dot" style="background:#16a34a"></span>Roth IRA</h4>
+    <ul>
+      <li>After-tax contributions; qualified withdrawals tax-free</li>
+      <li><strong>Contributions are always accessible penalty-free</strong>, regardless of age — the IRS lets you pull out what you put in first</li>
+      <li>Set the <em>Contribution Basis</em> to tell the planner how much of your balance is your actual contributions vs. growth</li>
+      <li>The <em>At Retirement</em> breakdown distinguishes contributions, mature conversions, pending conversions, and earnings</li>
+    </ul>
+  </div>
+  <div>
+    <h4><span class="dot" style="background:#9333ea"></span>Brokerage (Taxable)</h4>
+    <ul>
+      <li>After-tax, no restrictions on withdrawals</li>
+      <li>No contribution limits; useful as a bridge account before age 59½</li>
+      <li>In the withdrawal strategy, brokerage is often drawn first to preserve tax-advantaged growth</li>
+    </ul>
+  </div>
+</div>
+
+<h3>Contribution Basis (Roth accounts only)</h3>
+<p>This field records the <em>cost basis</em> — the after-tax dollars you actually contributed, not counting gains. The planner uses this to apply IRS withdrawal ordering rules and warn you if early withdrawals would incur a 10% penalty.</p>
+
+<div class="callout amber">
+  <strong>Where to find your contribution basis:</strong> Log in to your brokerage or IRA custodian. Look for "Cost Basis," "Contribution History," or "Roth IRA Basis." If uncertain, set it conservatively (lower than actual) to get a conservative safety estimate.
+</div>
+
+<h3>Expected Return Presets</h3>
+<table>
+  <thead><tr><th>Preset</th><th>Rate</th><th>Best For</th></tr></thead>
+  <tbody>
+    <tr><td>Conservative</td><td>4%/yr</td><td>Heavy bonds, near-retirement portfolios</td></tr>
+    <tr><td>Moderate</td><td>7%/yr</td><td>60/40 stock-bond blend, default assumption</td></tr>
+    <tr><td>Aggressive</td><td>10%/yr</td><td>Mostly equities, long time horizon</td></tr>
+    <tr><td>Custom</td><td>You set it</td><td>Specific fund projections</td></tr>
+  </tbody>
+</table>
+
+<h3>At-Retirement Breakdown</h3>
+<p>Each account card shows a breakdown of its projected value at retirement, split into contributions, employer match (Traditional 401k only), and market growth. This helps you understand how much of your wealth is your own contributions vs. compounding returns.</p>
+
+<div class="callout green">
+  <strong>Roth IRA penalty-free pool:</strong> The breakdown shows your penalty-free pool = contributions + conversions ≥ 5 years old. This is the amount you can access before age 59½ without penalty or tax.
+</div>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════
+     3. INCOME
+═══════════════════════════════════════════════════════════ -->
+<h2 id="income">3. Income Tab</h2>
+
+<h3>Social Security</h3>
+<p>Toggle Social Security on and enter:</p>
+<ul>
+  <li><strong>Monthly benefit</strong> — your estimated benefit at your chosen start age. You can find this on <a href="https://ssa.gov/myaccount">ssa.gov/myaccount</a>.</li>
+  <li><strong>Start age</strong> — when you begin collecting (see milestones section below for the tradeoffs).</li>
+</ul>
+
+<div class="callout amber">
+  The planner models Social Security taxation: up to 85% of your benefit is included in taxable income once combined income exceeds $34,000 (single) or $44,000 (MFJ). The remaining 15% is always tax-free.
+</div>
+
+<h3>Pension</h3>
+<p>If you have a defined-benefit pension, toggle it on and enter the monthly payment and the age it begins.</p>
+
+<h3>Employment Income &amp; Employer Match</h3>
+<ul>
+  <li><strong>Annual Income</strong> — your gross salary. Used only to compute employer match; does not affect withdrawal projections directly.</li>
+  <li><strong>Employer Match %</strong> — the percentage of your contribution the employer matches (e.g., 50 = 50 cents per dollar contributed).</li>
+  <li><strong>Match Cap % of Salary</strong> — the salary percentage at which the match stops (e.g., 6 means the employer matches your contributions up to 6% of salary).</li>
+</ul>
+
+<p>The planner shows a live preview of your annual match and warns you if you are leaving free money on the table by contributing below the match cap.</p>
+
+<div class="callout blue">
+  <strong>Example:</strong> Salary $100,000, match 100%, cap 6% of salary. If you contribute $500/month ($6,000/yr = 6% of salary), you get the full $6,000 employer match. If you only contribute $400/month (4.8% of salary), you receive only $4,800 — leaving $1,200 unclaimed.
+</div>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════
+     4. WITHDRAWAL STRATEGY
+═══════════════════════════════════════════════════════════ -->
+<h2 id="strategy">4. Withdrawal Strategy Tab</h2>
+
+<h3>Core Inputs</h3>
+<table>
+  <thead><tr><th>Input</th><th>What It Does</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Retirement Age</strong></td><td>The year contributions stop and withdrawals begin</td></tr>
+    <tr><td><strong>Life Expectancy</strong></td><td>Projection endpoint; set conservatively (age 90–95 is common)</td></tr>
+    <tr><td><strong>Annual Spending</strong></td><td>Your target annual expenses in today's dollars; inflated each year automatically</td></tr>
+    <tr><td><strong>Inflation Rate</strong></td><td>How fast costs grow (default 2.5%). Applies to spending and tax brackets</td></tr>
+  </tbody>
+</table>
+
+<h3>Withdrawal Mode</h3>
+<p>Choose how spending scales over retirement:</p>
+<ul>
+  <li><strong>Fixed Amount</strong> — you spend the same real (inflation-adjusted) dollar amount every year</li>
+  <li><strong>Percentage of Portfolio</strong> — you spend a fixed percentage of your balance each year; spending adjusts automatically as your portfolio grows or shrinks. This prevents a zero-balance scenario but may mean spending cuts in bad markets.</li>
+</ul>
+
+<h3>Smart Withdrawal Order</h3>
+<p>The planner automatically determines the most tax-efficient order to draw from your accounts each year. The general logic is:</p>
+
+<ol>
+  <li>Cover shortfall (spending minus income from SS and pension) by drawing from <strong>brokerage</strong> first — no tax hit on principal, and it preserves tax-advantaged growth.</li>
+  <li>Then draw from <strong>Roth IRA</strong> — tax-free, no RMD, best to let it compound.</li>
+  <li>Then draw from <strong>Roth 401(k)</strong>.</li>
+  <li>Finally draw from <strong>Traditional 401(k)</strong> — taxable, drawn last to minimize the tax bill.</li>
+</ol>
+
+<div class="callout amber">
+  <strong>Rule of 55:</strong> If you retire at age 55–59 and have separated from your employer, you can withdraw from your <em>current employer's</em> 401(k) without the 10% early penalty. The planner marks 401(k) withdrawals before age 59½ with a "10% Penalty" badge unless you qualify for this rule.
+</div>
+
+<h3>Early Roth IRA Withdrawal Warning</h3>
+<p>If your retirement age is below 59½ and your projected spending requires drawing beyond your penalty-free Roth IRA pool (contributions + conversions ≥ 5 years old), a red warning card appears showing:</p>
+<ul>
+  <li>Which ages are at risk</li>
+  <li>Your penalty-free pool at each age</li>
+  <li>The dollar amount at risk of triggering a 10% penalty</li>
+</ul>
+
+<div class="callout red">
+  <strong>IRS Roth IRA withdrawal order:</strong> The IRS mandates you consume layers in this order:
+  <ol style="margin-top:6px">
+    <li>Contributions (your original after-tax deposits) — always penalty-free and tax-free</li>
+    <li>Conversion principal ≥ 5 years old — penalty-free before 59½</li>
+    <li>Conversion principal &lt; 5 years old — 10% penalty before 59½</li>
+    <li>Earnings — 10% penalty + income tax before 59½</li>
+  </ol>
+</div>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════
+     5. ROTH CONVERSION
+═══════════════════════════════════════════════════════════ -->
+<h2 id="conversion">5. Roth Conversion Tab</h2>
+
+<h3>What Is a Roth Conversion Ladder?</h3>
+<p>A Roth conversion means moving money from a Traditional 401(k) (pre-tax) to a Roth IRA (after-tax) and paying the income tax now, at a potentially low rate, in exchange for tax-free growth and withdrawals later.</p>
+
+<p>The <em>ladder</em> strategy involves doing systematic conversions each year during the period between retirement and when RMDs begin — typically the lowest-income window of your life.</p>
+
+<h3>Target Bracket</h3>
+<p>Choose how much of the tax bracket you want to fill each year:</p>
+<table>
+  <thead><tr><th>Option</th><th>2025 Taxable Income Ceiling (Single)</th><th>Best When</th></tr></thead>
+  <tbody>
+    <tr><td>12% bracket</td><td>Up to $48,475</td><td>Conservative; almost always worthwhile vs. future RMD taxes</td></tr>
+    <tr><td>22% bracket</td><td>Up to $103,350</td><td>Worthwhile if you expect RMDs to push you into 24%+</td></tr>
+    <tr><td>24% bracket</td><td>Up to $197,300</td><td>Large trad401k balance and high expected RMDs</td></tr>
+  </tbody>
+</table>
+<p><em>All thresholds are inflation-adjusted each year in the projection.</em></p>
+
+<h3>Conversions by Year Table</h3>
+<p>The table shows each conversion year with:</p>
+<table>
+  <thead><tr><th>Column</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Age</strong></td><td>Your age at time of conversion</td></tr>
+    <tr><td><strong>Convert</strong></td><td>Dollar amount moved from Traditional 401(k) → Roth IRA</td></tr>
+    <tr><td><strong>Tax</strong></td><td>Estimated federal income tax owed on the conversion</td></tr>
+    <tr><td><strong>Tax From</strong></td><td><em>Brokerage</em> = tax paid from taxable account (ideal); <em>Netted</em> = reduced conversion so the tax comes out of the converted amount; <em>Mixed</em> = partially both</td></tr>
+    <tr><td><strong>Accessible By</strong></td><td>For conversions before age 59½, the earliest penalty-free access date (your conversion age + 5 years). Conversions at 59½+ are accessible immediately.</td></tr>
+  </tbody>
+</table>
+
+<div class="callout amber">
+  <strong>The Roth Conversion 5-Year Rule:</strong> Each conversion you make before age 59½ starts its own 5-year clock. You must wait 5 years from the conversion date before you can withdraw that money penalty-free. If you plan to draw from converted funds before 59½, make sure the conversion is at least 5 years old. This is separate from the 5-year rule on <em>earnings</em>.
+</div>
+
+<h3>Summary Metrics</h3>
+<ul>
+  <li><strong>Total Converted</strong> — cumulative amount moved across all years</li>
+  <li><strong>Total Conv. Tax</strong> — total tax paid on conversions</li>
+  <li><strong>RMD Balance Reduction</strong> — how much less your Traditional 401(k) has at RMD age compared to no conversions; a larger number means lower future RMDs and less forced income</li>
+</ul>
+
+<div class="callout green">
+  <strong>Key insight:</strong> Paying $9,000 in tax now to avoid $15,000+ in RMD-driven taxes later is often a good trade. The planner helps you visualize exactly how much you save.
+</div>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════
+     6. MONTE CARLO
+═══════════════════════════════════════════════════════════ -->
+<h2 id="montecarlo">6. Monte Carlo Tab</h2>
+
+<h3>Why Monte Carlo?</h3>
+<p>The main projection uses a single constant return rate — clean, but unrealistic. Real markets fluctuate. A sequence of poor returns early in retirement (called <em>sequence-of-returns risk</em>) can permanently deplete a portfolio even if the long-run average is fine.</p>
+
+<p>Monte Carlo runs 1,000 simulations of your retirement, each with random annual returns drawn from a normal distribution centered on your assumed return rate. It answers: <em>how often does your money last?</em></p>
+
+<h3>Success Rate</h3>
+<p>The headline number is the percentage of simulations where your portfolio survives to your life expectancy. General benchmarks:</p>
+<table>
+  <thead><tr><th>Success Rate</th><th>Interpretation</th></tr></thead>
+  <tbody>
+    <tr><td>95% or above</td><td>Very safe; you could spend more or retire earlier</td></tr>
+    <tr><td>85%–95%</td><td>Comfortable; within the range most planners target</td></tr>
+    <tr><td>75%–85%</td><td>Acceptable; consider building a small buffer</td></tr>
+    <tr><td>Below 75%</td><td>Risky; consider reducing spending, delaying retirement, or increasing savings</td></tr>
+  </tbody>
+</table>
+
+<h3>Fan Chart</h3>
+<p>The fan chart shows five percentile bands across all simulations:</p>
+<ul>
+  <li><strong>Median (50th)</strong> — the middle outcome; half of simulations end better, half worse</li>
+  <li><strong>25th / 75th percentiles</strong> — the "likely range"</li>
+  <li><strong>10th / 90th percentiles</strong> — the extreme tails (unlucky and lucky market sequences)</li>
+</ul>
+
+<div class="callout blue">
+  Run Monte Carlo after finalizing your other inputs to get a realistic success probability. Re-run whenever you change spending, retirement age, or asset allocation.
+</div>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════
+     7. SETTINGS
+═══════════════════════════════════════════════════════════ -->
+<h2 id="settings">7. Settings Tab</h2>
+
+<table>
+  <thead><tr><th>Setting</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Birth Year</strong></td>
+      <td>Sets your current age. Also determines your RMD start age (73 if born 1951–1959; 75 if born 1960+) and Social Security Full Retirement Age.</td>
+    </tr>
+    <tr>
+      <td><strong>Filing Status</strong></td>
+      <td>
+        <em>Single</em> — 2025 standard deduction $15,000<br />
+        <em>Married Filing Jointly (MFJ)</em> — standard deduction $30,000 and wider tax brackets<br />
+        This affects estimated taxes on Roth conversions and withdrawals.
+      </td>
+    </tr>
+    <tr>
+      <td><strong>Reset All</strong></td>
+      <td>Clears all inputs back to defaults and removes saved state from local storage.</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════
+     8. CHARTS
+═══════════════════════════════════════════════════════════ -->
+<h2 id="chart">8. Understanding the Charts</h2>
+
+<h3>Portfolio Projection (main chart)</h3>
+<p>A stacked area chart showing each account's balance year by year. Account colors:</p>
+<ul>
+  <li><span class="chip blue">Traditional 401(k)</span> — blue</li>
+  <li><span class="chip teal">Roth 401(k)</span> — teal</li>
+  <li><span class="chip green">Roth IRA</span> — green</li>
+  <li><span class="chip purple">Brokerage</span> — purple</li>
+</ul>
+<p>The vertical dashed line marks your retirement age. Milestone age markers appear as labeled lines (Rule of 55, age 59½, Social Security ages, Medicare, RMDs).</p>
+
+<h3>Withdrawal Detail Chart</h3>
+<p>In the Withdrawal Strategy tab, a stacked bar chart shows which accounts fund each year of retirement, making the withdrawal order visible year by year.</p>
+
+<h3>Roth Conversion Bar Chart</h3>
+<p>Shows conversion amount (blue) and tax paid (red) side by side for each year in the conversion window.</p>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════
+     9. MILESTONES
+═══════════════════════════════════════════════════════════ -->
+<h2 id="milestones">9. Key Retirement Milestones</h2>
+
+<table>
+  <thead><tr><th>Age</th><th>Milestone</th><th>Why It Matters</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>55</td>
+      <td>Rule of 55</td>
+      <td>If you leave your employer in or after the year you turn 55, you can take penalty-free withdrawals from <em>that employer's</em> 401(k). Rollover to an IRA first and you lose this benefit.</td>
+    </tr>
+    <tr>
+      <td>59½</td>
+      <td>Penalty-free access</td>
+      <td>The 10% early withdrawal penalty disappears for all account types. Roth IRA earnings also become tax-free once the account is 5+ years old.</td>
+    </tr>
+    <tr>
+      <td>62</td>
+      <td>Earliest Social Security</td>
+      <td>You can claim SS at 62, but your benefit is permanently reduced by ~30% compared to Full Retirement Age (FRA). Only makes sense if you have health concerns or no other income.</td>
+    </tr>
+    <tr>
+      <td>65</td>
+      <td>Medicare</td>
+      <td>You become eligible for Medicare Parts A and B. Budget for Part B premiums ($185+/month in 2025) and any supplemental insurance.</td>
+    </tr>
+    <tr>
+      <td>67</td>
+      <td>Social Security FRA</td>
+      <td>Full Retirement Age for anyone born in 1960 or later. Claiming here gives 100% of your benefit.</td>
+    </tr>
+    <tr>
+      <td>70</td>
+      <td>SS Maximum Benefit</td>
+      <td>Delaying SS past FRA earns 8%/yr until age 70. After 70 there is no further increase — always claim by age 70.</td>
+    </tr>
+    <tr>
+      <td>73 / 75</td>
+      <td>RMDs Begin</td>
+      <td>The IRS requires you to withdraw a minimum amount from Traditional 401(k) and Traditional IRA each year. RMDs are taxable. A large traditional balance = large forced income = potentially higher brackets. Roth conversions before this age reduce RMDs.</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════
+     10. TAX CONCEPTS
+═══════════════════════════════════════════════════════════ -->
+<h2 id="tax">10. Tax Concepts Explained</h2>
+
+<h3>How the Planner Estimates Taxes</h3>
+<p>The planner uses 2025 federal income tax brackets, inflation-adjusted each year at your chosen inflation rate. It does <em>not</em> model state taxes, IRMAA (Medicare surcharges), ACA subsidy cliffs, or the Net Investment Income Tax (3.8%). These can matter — consult a tax advisor for a full picture.</p>
+
+<h3>Standard Deduction</h3>
+<p>The planner subtracts the standard deduction before applying tax brackets:</p>
+<ul>
+  <li><strong>Single:</strong> $15,000 (2025)</li>
+  <li><strong>Married Filing Jointly:</strong> $30,000 (2025)</li>
+</ul>
+<p>This means for single filers, your first $15,000 of income in retirement is effectively tax-free. The bracket ceilings in the Roth Conversion table refer to <em>taxable income</em> (after deduction).</p>
+
+<h3>2025 Federal Tax Brackets (Single / MFJ)</h3>
+<table>
+  <thead><tr><th>Rate</th><th>Single Taxable Income</th><th>MFJ Taxable Income</th></tr></thead>
+  <tbody>
+    <tr><td>10%</td><td>$0 – $11,925</td><td>$0 – $23,850</td></tr>
+    <tr><td>12%</td><td>$11,926 – $48,475</td><td>$23,851 – $96,950</td></tr>
+    <tr><td>22%</td><td>$48,476 – $103,350</td><td>$96,951 – $206,700</td></tr>
+    <tr><td>24%</td><td>$103,351 – $197,300</td><td>$206,701 – $394,600</td></tr>
+    <tr><td>32%</td><td>$197,301 – $250,525</td><td>$394,601 – $501,050</td></tr>
+    <tr><td>35%</td><td>$250,526 – $626,350</td><td>$501,051 – $751,600</td></tr>
+    <tr><td>37%</td><td>Over $626,350</td><td>Over $751,600</td></tr>
+  </tbody>
+</table>
+<p><em>These brackets are inflation-adjusted by the planner for each future year at your chosen inflation rate.</em></p>
+
+<h3>Social Security Taxation</h3>
+<p>The planner includes 85% of your Social Security benefit in the taxable income baseline when computing Roth conversion headroom and withdrawal taxes. This is the maximum inclusion rate, which applies when combined income (AGI + non-taxable interest + ½ of SS) exceeds $34,000 (single) or $44,000 (MFJ). The remaining 15% is always tax-free.</p>
+
+<h3>Required Minimum Distributions (RMDs)</h3>
+<p>Once you reach RMD age, the IRS requires annual withdrawals from Traditional accounts calculated by dividing your year-end balance by an IRS life-expectancy factor (roughly 25–27 at age 73, shrinking each year). The planner models this and adds RMD income to your taxable income estimate. Roth conversions before RMD age reduce your traditional balance and therefore your future RMD obligations.</p>
+
+<hr />
+
+<!-- ═══════════════════════════════════════════════════════════
+     11. FAQ / SCENARIOS
+═══════════════════════════════════════════════════════════ -->
+<h2 id="faq">11. Common Questions &amp; Scenarios</h2>
+
+<h3>My money runs out before my life expectancy — what can I do?</h3>
+<ol>
+  <li>Increase monthly contributions (earlier is better due to compounding)</li>
+  <li>Delay retirement age by even 1–2 years (fewer withdrawal years + more accumulation)</li>
+  <li>Reduce target annual spending in retirement</li>
+  <li>Delay Social Security to 67 or 70 for a higher lifetime benefit</li>
+  <li>Enable Roth conversions to reduce future RMD taxes</li>
+  <li>Set withdrawal mode to "Percentage of Portfolio" — you never hit exactly $0 but spending adjusts with markets</li>
+</ol>
+
+<h3>Should I contribute to Traditional 401(k) or Roth 401(k)?</h3>
+<p>The classic rule: if your current tax rate is <em>lower</em> than your expected retirement rate, choose Roth (pay taxes now at the lower rate). If your current rate is <em>higher</em>, choose Traditional (defer taxes to retirement when you'll be in a lower bracket). Most people in their peak earning years favor Traditional; those early in their careers often favor Roth.</p>
+
+<h3>When should I start Social Security?</h3>
+<p>Delaying SS earns 8%/yr after FRA (age 67 for those born 1960+), up to age 70. The break-even age — where delayed benefits overtake early benefits in total — is typically around age 80–82. If you expect to live past 82, delaying usually pays off. The planner lets you model different start ages directly.</p>
+
+<h3>I plan to retire early (before 59½) — how do I avoid penalties?</h3>
+<p>Several strategies work together:</p>
+<ul>
+  <li><strong>Brokerage account:</strong> no restrictions, draw from here first</li>
+  <li><strong>Roth IRA contribution basis:</strong> you can always withdraw your original contributions (not earnings) without penalty</li>
+  <li><strong>Roth conversion ladder:</strong> convert Traditional → Roth IRA starting 5 years before you need the money; those conversions become penalty-free after 5 years</li>
+  <li><strong>Rule of 55:</strong> penalty-free 401(k) access if you left the employer in or after the year you turned 55</li>
+  <li><strong>SEPP (72(t) payments):</strong> not modeled here; consult a tax advisor for this advanced strategy</li>
+</ul>
+
+<h3>What is the conversion 5-year clock and does it reset?</h3>
+<p>Each Roth conversion creates its own 5-year clock, separate from any other conversion. A conversion made at age 55 becomes accessible penalty-free at age 60. A conversion at age 57 becomes accessible at 62. The clocks do <em>not</em> reset — they run in parallel. Once you pass age 59½, all conversions are accessible regardless of age.</p>
+
+<h3>Why is the conversion amount different from what I'd expect?</h3>
+<p>The conversion fills your chosen bracket ceiling based on <em>taxable income</em> (after the standard deduction). The planner also accounts for income already "on the table" — pension, Social Security (85% included), and any other income. If you already have $20,000 of taxable income, the converter only adds enough to reach the bracket ceiling from $20,000, not from $0.</p>
+
+<h3>My employer match seems too low — is the calculation right?</h3>
+<p>The match is capped at two limits: the percentage of your contribution they match (e.g., 50%) <em>and</em> the cap as a percentage of salary (e.g., up to 6% of salary). The planner checks both and applies whichever is more restrictive. It also warns you if you're contributing below the cap threshold and leaving match money unclaimed.</p>
+
+<h3>Does the planner account for inflation?</h3>
+<p>Yes. The inflation rate (default 2.5%) is applied to:</p>
+<ul>
+  <li>Annual spending (your expenses grow each year)</li>
+  <li>Federal tax brackets and standard deduction (brackets are indexed to inflation)</li>
+  <li>Social Security benefit (SS includes a COLA; the planner inflation-adjusts SS income)</li>
+</ul>
+<p>Account balances grow at their own return rate, independent of inflation.</p>
+
+<hr />
+
+<div class="callout blue" style="margin-top:32px">
+  <strong>Disclaimer:</strong> This tool is for educational and planning purposes only. It does not constitute financial, tax, or legal advice. All projections are estimates based on simplified models and your inputs. Consult a qualified financial advisor and tax professional before making retirement decisions.
+</div>
+
+<p style="text-align:center; color:#94a3b8; font-size:9pt; margin-top:32px">
+  Retirement Planner · <a href="https://cdaoucsd.github.io/retirement-planner/">cdaoucsd.github.io/retirement-planner</a> · Generated 2025
+</p>
+
+</body>
+</html>
