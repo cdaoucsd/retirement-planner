@@ -753,6 +753,95 @@ describe("spending phases", () => {
   });
 });
 
+// ─── Part-time (semi-retired) phase ──────────────────────────────────────────
+describe("runProjection — part-time phase", () => {
+  it("partTimeEnabled false leaves projection unchanged even with part-time params set", () => {
+    const mk = (extra = {}) => baseParams({
+      currentAge: 50, retirementAge: 60, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 20000,
+      accounts: baseAccounts({ trad: { monthly: 1000, balance: 100000 }, brokerage: { balance: 50000 } }),
+      ...extra,
+    });
+    const base = runProjection(mk());
+    const off  = runProjection(mk({
+      partTimeEnabled: false, partTimeStartAge: 55, partTimeIncome: 50000,
+      partTimeContrib: { trad401k: 100, roth401k: 0, rothIRA: 0, brokerage: 0 },
+      partTimeMatchPct: 100, partTimeMatchCapPct: 6,
+    }));
+    expect(off).toEqual(base);
+  });
+
+  it("full-time contributions and match stop at the part-time start age", () => {
+    const data = runProjection(baseParams({
+      currentAge: 50, retirementAge: 60, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 0,
+      accounts: baseAccounts({ trad: { monthly: 1000 } }),
+      annualIncome: 120000, employerMatchPct: 100, employerMatchCapPct: 6,
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 0,
+    }));
+    // 5 accumulation years (50–54): $12K/yr contributions + $7.2K/yr match (6% of $120K)
+    expect(data.find(d => d.age === 60).trad401k).toBeCloseTo(5 * (12000 + 7200), -1);
+    expect(data.find(d => d.age === 54).employerMatchAnnual).toBeCloseTo(7200, 0);
+    expect(data.find(d => d.age === 55).employerMatchAnnual).toBe(0);
+  });
+
+  it("shortfall in semi-retired years is drawn brokerage-first", () => {
+    const data = runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 50000,
+      accounts: baseAccounts({ trad: { balance: 500000 }, brokerage: { balance: 300000 } }),
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 30000,
+    }));
+    const y = data.find(d => d.age === 55);
+    expect(y.partTimeIncome).toBeCloseTo(30000, -1);
+    expect(y.wBrokerage).toBeCloseTo(20000, -1); // 50000 spending − 30000 income
+    expect(y.wTrad401k).toBe(0);
+  });
+
+  it("pension income reduces the semi-retired shortfall", () => {
+    const mk = (pension) => runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 50000,
+      accounts: baseAccounts({ brokerage: { balance: 500000 } }),
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 20000,
+      pensionEnabled: pension, pensionMonthly: 1000, pensionStartAge: 55,
+    }));
+    const w = (p) => mk(p).find(d => d.age === 55).wBrokerage;
+    expect(w(true)).toBeCloseTo(w(false) - 12000, -1);
+  });
+
+  it("part-time income inflates with the general inflation rate", () => {
+    const data = runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      inflationRate: 3, withdrawalMode: "fixed", annualSpending: 0,
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 30000,
+    }));
+    expect(data.find(d => d.age === 60).partTimeIncome)
+      .toBeCloseTo(30000 * Math.pow(1.03, 6), -2); // 6 years after currentAge 54
+  });
+
+  it("part-time start age clamps into (currentAge, retirementAge)", () => {
+    const data = runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 0,
+      accounts: baseAccounts({ trad: { monthly: 1000 } }),
+      partTimeEnabled: true, partTimeStartAge: 30, partTimeIncome: 10000,
+    }));
+    expect(data.find(d => d.age === 54).partTimeIncome).toBe(0); // clamped to 55
+    expect(data.find(d => d.age === 55).partTimeIncome).toBeCloseTo(10000, -1);
+  });
+
+  it("rate mode: semi-retired years still use fixed annual spending for the gap", () => {
+    const data = runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "rate", withdrawalRate: 4, annualSpending: 50000,
+      accounts: baseAccounts({ brokerage: { balance: 1_000_000 } }),
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 30000,
+    }));
+    expect(data.find(d => d.age === 55).wBrokerage).toBeCloseTo(20000, -1);
+  });
+});
+
 // ─── Contribution limits ──────────────────────────────────────────────────────
 describe("contribution limits (2025)", () => {
   it("401(k): base / 50+ catch-up / 60–63 super catch-up", () => {
