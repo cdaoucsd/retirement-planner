@@ -475,6 +475,9 @@ export function runProjection(params) {
       const spendYr = spending * spendingMultiplier(age, spendingPhases) * yearInfl;
       const leftover = ptIncomeYr + ssAnnual + penAnnual - spendYr;
       ptSpendNeed = Math.max(0, -leftover);
+
+      const plannedAnnual = ptPlannedMonthly * 12;
+      if (leftover > 0 && plannedAnnual > 0) ptScale = Math.min(1, leftover / plannedAnnual);
     }
 
     for (const k of ACCT_KEYS) {
@@ -484,6 +487,9 @@ export function runProjection(params) {
         if (isAccumulating) {
           bal[k] += clamp(accounts[k].monthly, 0, 50000);
           if (k === "trad401k") bal[k] += employerMonthlyMatch;
+        } else if (isSemiRetired) {
+          bal[k] += ptScale * ptc[k];
+          if (k === "trad401k") bal[k] += ptMatchAnnual / 12;
         }
         bal[k] = safeBal(bal[k]);
       }
@@ -496,6 +502,12 @@ export function runProjection(params) {
       roth401kContribBasis += clamp(accounts.roth401k.monthly, 0, 50000) * 12;
       rothIRAContribBasis  += clamp(accounts.rothIRA.monthly,  0, 50000) * 12;
       brokerageBasis       += clamp(accounts.brokerage.monthly, 0, 50000) * 12;
+    } else if (isSemiRetired) {
+      trad401kContribBasis += ptScale * ptc.trad401k * 12;
+      trad401kMatchBasis   += ptMatchAnnual;
+      roth401kContribBasis += ptScale * ptc.roth401k * 12;
+      rothIRAContribBasis  += ptScale * ptc.rothIRA  * 12;
+      brokerageBasis       += ptScale * ptc.brokerage * 12;
     }
 
     const total     = bal.trad401k + bal.roth401k + bal.rothIRA + bal.brokerage;

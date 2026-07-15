@@ -840,6 +840,59 @@ describe("runProjection — part-time phase", () => {
     }));
     expect(data.find(d => d.age === 55).wBrokerage).toBeCloseTo(20000, -1);
   });
+
+  it("surplus income funds part-time contributions in full", () => {
+    const data = runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 40000,
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 70000,
+      partTimeContrib: { trad401k: 500, roth401k: 0, rothIRA: 500, brokerage: 0 },
+    }));
+    const y = data.find(d => d.age === 55);
+    // leftover $30K > planned $12K → fully funded
+    expect(y.partTimeContribAnnual).toBeCloseTo(12000, -1);
+    expect(y.wTotal).toBe(0);
+    const at64 = data.find(d => d.age === 64); // 10 semi-retired years, 0% return
+    expect(at64.trad401k).toBeCloseTo(60000, -1);
+    expect(at64.rothIRA).toBeCloseTo(60000, -1);
+  });
+
+  it("partial leftover scales contributions proportionally", () => {
+    const data = runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 40000,
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 46000,
+      partTimeContrib: { trad401k: 750, roth401k: 0, rothIRA: 250, brokerage: 0 },
+    }));
+    const y = data.find(d => d.age === 55);
+    // leftover $6K of $12K planned → scale 0.5
+    expect(y.partTimeContribAnnual).toBeCloseTo(6000, -1);
+    expect(y.trad401k).toBeCloseTo(4500, -1);
+    expect(y.rothIRA).toBeCloseTo(1500, -1);
+  });
+
+  it("no contributions in shortfall years", () => {
+    const data = runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 50000,
+      accounts: baseAccounts({ brokerage: { balance: 500000 } }),
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 30000,
+      partTimeContrib: { trad401k: 500, roth401k: 0, rothIRA: 0, brokerage: 0 },
+    }));
+    const y = data.find(d => d.age === 55);
+    expect(y.partTimeContribAnnual).toBe(0);
+    expect(y.wBrokerage).toBeCloseTo(20000, -1);
+  });
+
+  it("part-time Roth IRA contributions extend the withdrawable basis", () => {
+    const data = runProjection(baseParams({
+      currentAge: 54, retirementAge: 60, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 0,
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 20000,
+      partTimeContrib: { trad401k: 0, roth401k: 0, rothIRA: 500, brokerage: 0 },
+    }));
+    expect(data.find(d => d.age === 59).rothIRAContribBasis).toBeCloseTo(5 * 6000, -1);
+  });
 });
 
 // ─── Contribution limits ──────────────────────────────────────────────────────
