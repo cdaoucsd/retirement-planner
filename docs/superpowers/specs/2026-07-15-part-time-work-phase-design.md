@@ -75,7 +75,9 @@ const isAccumulating = !isRetired && !isSemiRetired;
 
 1. **Income & leftover.** `ptIncomeYr = partTimeIncome * yearInfl`.
    `spendYr = spending * spendingMultiplier(age, phases) * yearInfl`.
-   `leftover = ptIncomeYr - spendYr`.
+   `leftover = ptIncomeYr + ssAnnual + penAnnual - spendYr`.
+   (SS/pension can start before retirement age — e.g., pension at 55 — and the
+   engine already computes them per-year; semi-retired years must not ignore them.)
 2. **Contributions (leftover > 0 only).**
    `plannedAnnual = sum(partTimeContrib) * 12`.
    `scale = plannedAnnual > 0 ? min(1, max(0, leftover) / plannedAnnual) : 0`.
