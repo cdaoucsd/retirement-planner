@@ -10,7 +10,7 @@ import { fmt$, fmtFull } from "./format.js";
 import { NumberInput, ClearButton, Card, SectionHeader } from "./components/ui.jsx";
 import { ProjectionChart, WithdrawalsChart } from "./components/charts.jsx";
 import AccountCard from "./components/AccountCard.jsx";
-import { IncomeCard, SSOptimizerPanel } from "./components/IncomePanels.jsx";
+import { IncomeCard, SSOptimizerPanel, PartTimeCard } from "./components/IncomePanels.jsx";
 import { WithdrawalStrategyPanel, MilestoneTimeline } from "./components/StrategyPanel.jsx";
 import RothConversionPanel from "./components/ConversionPanel.jsx";
 import MonteCarloPanel from "./components/MonteCarloPanel.jsx";
@@ -492,6 +492,9 @@ export default function RetirementPlanner() {
             <NumberInput label="Start Age" value={pensionStartAge} onChange={setPensionStartAge} prefix="" min={50} max={75} ariaLabel="Pension start age" />
             <p className="text-xs text-haze">Pension modeled as a fixed monthly payment (not inflation-adjusted).</p>
           </IncomeCard>
+          <PartTimeCard partTime={partTime} onChange={setPartTime}
+            currentAge={safeCurrentAge} retirementAge={safeRetirementAge}
+            annualSpending={annualSpending} withdrawalMode={withdrawalMode} />
         </div>
 
         {/* ── 02 · Money out ── */}
