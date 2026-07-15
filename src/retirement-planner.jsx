@@ -346,10 +346,11 @@ export default function RetirementPlanner() {
         <Card className="p-5 mb-2" >
           <div className="flex items-baseline justify-between mb-3">
             <h2 className="text-sm font-semibold text-ink">Your lifetime, in dollars</h2>
-            <p className="text-xs text-haze hidden sm:block">shaded: <span className="text-evergreen-dark">conversion window</span> · <span className="text-danger">RMD years</span></p>
+            <p className="text-xs text-haze hidden sm:block">shaded: {partTime.enabled && <><span className="text-copper">part-time</span> · </>}<span className="text-evergreen-dark">conversion window</span> · <span className="text-danger">RMD years</span></p>
           </div>
           <ProjectionChart projection={projection} currentAge={safeCurrentAge}
-            retirementAge={safeRetirementAge} lifeExpectancy={safeLifeExpectancy} rmdAge={rmdAge} />
+            retirementAge={safeRetirementAge} lifeExpectancy={safeLifeExpectancy} rmdAge={rmdAge}
+            partTimeStartAge={partTime.enabled ? safePartTimeStartAge : null} />
           {willRunOut && (
             <div className="mt-3 bg-danger-light border border-danger/20 rounded-md px-4 py-2.5 text-sm text-danger" role="alert">
               Your portfolio may be depleted before age {safeLifeExpectancy}. Consider increasing contributions or reducing spending.

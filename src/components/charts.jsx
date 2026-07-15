@@ -71,9 +71,10 @@ export function MCTooltip({ active, payload, label }) {
 
 // ─── Hero: portfolio projection with the age spine ────────────────────────────
 // Milestone markers and retirement-phase shading live directly on the age axis.
-export function ProjectionChart({ projection, currentAge, retirementAge, lifeExpectancy, rmdAge }) {
+export function ProjectionChart({ projection, currentAge, retirementAge, lifeExpectancy, rmdAge, partTimeStartAge = null }) {
   const spine = [
     { age: retirementAge, label: "Retire", color: "#B4642D", solid: true },
+    ...(partTimeStartAge != null ? [{ age: partTimeStartAge, label: "Part-time", color: "#B4642D" }] : []),
     { age: 59.5, label: "59½", color: "#2E6E5E" },
     { age: 65, label: "Medicare", color: "#6D5A8C" },
     { age: rmdAge, label: `RMDs`, color: "#B3402F" },
@@ -101,7 +102,10 @@ export function ProjectionChart({ projection, currentAge, retirementAge, lifeExp
         <YAxis tickFormatter={fmt$} tick={AXIS_TICK} stroke="#7C8A85" width={58} tickLine={false} axisLine={false} />
         <Tooltip content={<PortfolioTooltip />} />
         <Legend wrapperStyle={{ fontSize: "12px" }} />
-        {/* Phase shading: tax-optimization window, then RMD phase */}
+        {/* Phase shading: part-time window, tax-optimization window, then RMD phase */}
+        {partTimeStartAge != null && partTimeStartAge < retirementAge && (
+          <ReferenceArea x1={Math.max(partTimeStartAge, currentAge)} x2={retirementAge} fill="#B4642D" fillOpacity={0.05} />
+        )}
         {optStart < rmdAge && rmdAge < lifeExpectancy && (
           <ReferenceArea x1={optStart} x2={rmdAge} fill="#2E6E5E" fillOpacity={0.04} />
         )}
