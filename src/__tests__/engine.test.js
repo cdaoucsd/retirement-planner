@@ -893,6 +893,46 @@ describe("runProjection — part-time phase", () => {
     }));
     expect(data.find(d => d.age === 59).rothIRAContribBasis).toBeCloseTo(5 * 6000, -1);
   });
+
+  it("part-time employer match lands in trad401k and tracks match basis", () => {
+    const data = runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 0,
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 40000,
+      partTimeContrib: { trad401k: 200, roth401k: 0, rothIRA: 0, brokerage: 0 },
+      partTimeMatchPct: 100, partTimeMatchCapPct: 6,
+    }));
+    const y = data.find(d => d.age === 55);
+    // $2,400/yr employee = 6% of $40K → fully matched: $2,400
+    expect(y.partTimeMatchAnnual).toBeCloseTo(2400, -1);
+    expect(y.trad401k).toBeCloseTo(2400 + 2400, -1);
+    expect(y.trad401kMatchBasis).toBeCloseTo(2400, -1);
+  });
+
+  it("match scales with actual (leftover-capped) contributions", () => {
+    const data = runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 37600,
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 40000,
+      partTimeContrib: { trad401k: 400, roth401k: 0, rothIRA: 0, brokerage: 0 },
+      partTimeMatchPct: 100, partTimeMatchCapPct: 6,
+    }));
+    const y = data.find(d => d.age === 55);
+    // leftover $2,400 of $4,800 planned → scale 0.5 → employee $2,400/yr = 6% of $40K → match $2,400
+    expect(y.partTimeContribAnnual).toBeCloseTo(2400, -1);
+    expect(y.partTimeMatchAnnual).toBeCloseTo(2400, -1);
+  });
+
+  it("no part-time match when part-time 401(k) contributions are zero", () => {
+    const data = runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 0,
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 40000,
+      partTimeContrib: { trad401k: 0, roth401k: 0, rothIRA: 500, brokerage: 0 },
+      partTimeMatchPct: 100, partTimeMatchCapPct: 6,
+    }));
+    expect(data.find(d => d.age === 55).partTimeMatchAnnual).toBe(0);
+  });
 });
 
 // ─── Contribution limits ──────────────────────────────────────────────────────

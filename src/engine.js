@@ -478,6 +478,13 @@ export function runProjection(params) {
 
       const plannedAnnual = ptPlannedMonthly * 12;
       if (leftover > 0 && plannedAnnual > 0) ptScale = Math.min(1, leftover / plannedAnnual);
+
+      ptMatchAnnual = computeEmployerMatch({
+        income: ptIncomeYr,
+        matchPct: partTimeMatchPct,
+        capPct: partTimeMatchCapPct,
+        employeeMonthly: ptScale * (ptc.trad401k + ptc.roth401k),
+      });
     }
 
     for (const k of ACCT_KEYS) {
