@@ -62,6 +62,11 @@ const DEFAULTS = {
   stateTax: 'none',
   marketAssumptions: { ...MARKET_ASSUMPTIONS },
   spendingPhases: { enabled: false, slowGoAge: 75, slowGoPct: 85, noGoAge: 85, noGoPct: 75 },
+  partTime: {
+    enabled: false, startAge: 55, income: 30000,
+    contrib: { trad401k: 0, roth401k: 0, rothIRA: 0, brokerage: 0 },
+    matchPct: 0, matchCapPct: 6,
+  },
 };
 
 const STORAGE_KEY = "retirement_planner_state_v3";
@@ -90,6 +95,10 @@ function loadSavedState() {
       accounts: mergedAccounts,
       marketAssumptions: { ...DEFAULTS.marketAssumptions, ...(saved.marketAssumptions ?? {}) },
       spendingPhases: { ...DEFAULTS.spendingPhases, ...(saved.spendingPhases ?? {}) },
+      partTime: {
+        ...DEFAULTS.partTime, ...(saved.partTime ?? {}),
+        contrib: { ...DEFAULTS.partTime.contrib, ...(saved.partTime?.contrib ?? {}) },
+      },
     };
   } catch {
     return DEFAULTS;
@@ -123,6 +132,7 @@ export default function RetirementPlanner() {
   const [stateTax, setStateTax] = useState(saved.stateTax ?? 'none');
   const [marketAssumptions, setMarketAssumptions] = useState(saved.marketAssumptions ?? { ...MARKET_ASSUMPTIONS });
   const [spendingPhases, setSpendingPhases] = useState(saved.spendingPhases ?? DEFAULTS.spendingPhases);
+  const [partTime, setPartTime] = useState(saved.partTime ?? DEFAULTS.partTime);
 
   const [mcResult, setMcResult] = useState(null);
   const [mcRunning, setMcRunning] = useState(false);
@@ -132,6 +142,7 @@ export default function RetirementPlanner() {
   const safeRetirementAge = clamp(retirementAge, safeCurrentAge + 1, 100);
   const safeLifeExpectancy = clamp(lifeExpectancy, safeRetirementAge + 1, 110);
   const rmdAge = birthYear <= 1959 ? 73 : 75;
+  const safePartTimeStartAge = clamp(partTime.startAge, safeCurrentAge + 1, Math.max(safeCurrentAge + 1, safeRetirementAge - 1));
 
   useEffect(() => {
     try {
@@ -141,13 +152,15 @@ export default function RetirementPlanner() {
         ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge,
         annualIncome, employerMatchPct, employerMatchCapPct,
         rothConversionEnabled, rothConversionBracket, filingStatus, stateTax, marketAssumptions, spendingPhases,
+        partTime,
       }));
     } catch { /* storage unavailable */ }
   }, [retirementAge, lifeExpectancy, annualSpending, withdrawalMode, withdrawalRate,
       inflationRate, birthYear, accounts,
       ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge,
       annualIncome, employerMatchPct, employerMatchCapPct,
-      rothConversionEnabled, rothConversionBracket, filingStatus, stateTax, marketAssumptions, spendingPhases]);
+      rothConversionEnabled, rothConversionBracket, filingStatus, stateTax, marketAssumptions, spendingPhases,
+      partTime]);
 
   const resetAll = useCallback(() => {
     setRetirementAge(DEFAULTS.retirementAge); setLifeExpectancy(DEFAULTS.lifeExpectancy);
@@ -165,6 +178,7 @@ export default function RetirementPlanner() {
     setStateTax(DEFAULTS.stateTax);
     setMarketAssumptions({ ...MARKET_ASSUMPTIONS });
     setSpendingPhases(DEFAULTS.spendingPhases);
+    setPartTime(DEFAULTS.partTime);
     setMcResult(null);
     try { localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(LEGACY_STORAGE_KEY); } catch { /* ignore */ }
   }, []);
@@ -175,7 +189,10 @@ export default function RetirementPlanner() {
     inflationRate, ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge, birthYear,
     annualIncome, employerMatchPct, employerMatchCapPct,
     rothConversionBracket, filingStatus, stateTax, marketAssumptions, spendingPhases,
-  }), [accounts, safeCurrentAge, safeRetirementAge, safeLifeExpectancy, annualSpending, withdrawalMode, withdrawalRate, inflationRate, ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge, birthYear, annualIncome, employerMatchPct, employerMatchCapPct, rothConversionBracket, filingStatus, stateTax, marketAssumptions, spendingPhases]);
+    partTimeEnabled: partTime.enabled, partTimeStartAge: partTime.startAge,
+    partTimeIncome: partTime.income, partTimeContrib: partTime.contrib,
+    partTimeMatchPct: partTime.matchPct, partTimeMatchCapPct: partTime.matchCapPct,
+  }), [accounts, safeCurrentAge, safeRetirementAge, safeLifeExpectancy, annualSpending, withdrawalMode, withdrawalRate, inflationRate, ssEnabled, ssMonthly, ssStartAge, pensionEnabled, pensionMonthly, pensionStartAge, birthYear, annualIncome, employerMatchPct, employerMatchCapPct, rothConversionBracket, filingStatus, stateTax, marketAssumptions, spendingPhases, partTime]);
 
   const projectionResult = useMemo(() => {
     try {
@@ -232,7 +249,8 @@ export default function RetirementPlanner() {
   const endD         = projection[projection.length - 1] || {};
   const totalContrib = ACCT_KEYS.reduce((s, k) => s + safeNum(accounts[k].monthly), 0);
   const willRunOut   = endD.Total <= 0;
-  const withdrawalData = projection.filter(d => d.age >= safeRetirementAge);
+  const withdrawalStartAge = partTime.enabled ? Math.min(safePartTimeStartAge, safeRetirementAge) : safeRetirementAge;
+  const withdrawalData = projection.filter(d => d.age >= withdrawalStartAge);
 
   // Contribution-limit checks
   const k401Annual = (safeNum(accounts.trad401k.monthly) + safeNum(accounts.roth401k.monthly)) * 12;
@@ -242,6 +260,14 @@ export default function RetirementPlanner() {
   const limitWarns = [];
   if (k401Annual > k401Limit) limitWarns.push(`Combined 401(k) contributions of ${fmtFull(k401Annual)}/yr exceed the ${fmtFull(k401Limit)} employee limit (2025, age ${safeCurrentAge}).`);
   if (iraAnnual > iraLimit)  limitWarns.push(`Roth IRA contributions of ${fmtFull(iraAnnual)}/yr exceed the ${fmtFull(iraLimit)} limit (2025, age ${safeCurrentAge}).`);
+  if (partTime.enabled) {
+    const ptK401 = (safeNum(partTime.contrib.trad401k) + safeNum(partTime.contrib.roth401k)) * 12;
+    const ptK401Limit = contributionLimit401k(safePartTimeStartAge);
+    if (ptK401 > ptK401Limit) limitWarns.push(`Part-time 401(k) contributions of ${fmtFull(ptK401)}/yr exceed the ${fmtFull(ptK401Limit)} employee limit (2025, age ${safePartTimeStartAge}).`);
+    const ptIra = safeNum(partTime.contrib.rothIRA) * 12;
+    const ptIraLimit = contributionLimitIRA(safePartTimeStartAge);
+    if (ptIra > ptIraLimit) limitWarns.push(`Part-time Roth IRA contributions of ${fmtFull(ptIra)}/yr exceed the ${fmtFull(ptIraLimit)} limit (2025, age ${safePartTimeStartAge}).`);
+  }
 
   // Asset-location hint
   const tradSp = accountStockPct(accounts.trad401k);
