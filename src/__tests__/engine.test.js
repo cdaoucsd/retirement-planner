@@ -933,6 +933,36 @@ describe("runProjection — part-time phase", () => {
     }));
     expect(data.find(d => d.age === 55).partTimeMatchAnnual).toBe(0);
   });
+
+  it("part-time income is taxed; trad 401(k) part-time contributions reduce it", () => {
+    const mk = (contrib) => runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 0,
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 60000,
+      partTimeContrib: contrib,
+    }));
+    const none = mk({ trad401k: 0, roth401k: 0, rothIRA: 0, brokerage: 0 });
+    const trad = mk({ trad401k: 1000, roth401k: 0, rothIRA: 0, brokerage: 0 });
+    // $60K gross − $15K std deduction = $45K taxable → 1192.5 + (45000−11925)×0.12 = 5161.5
+    expect(none.find(d => d.age === 55).estTax).toBeCloseTo(5162, -1);
+    // $12K pre-tax 401(k) → $48K gross → $33K taxable → 1192.5 + (33000−11925)×0.12 = 3721.5
+    expect(trad.find(d => d.age === 55).estTax).toBeCloseTo(3722, -1);
+    // Full-time years remain untaxed by the engine (existing behavior)
+    expect(none.find(d => d.age === 54).estTax).toBe(0);
+  });
+
+  it("brokerage gains realized in semi-retired years stack on part-time income (CA ordinary)", () => {
+    const data = runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 60000,
+      accounts: baseAccounts({ brokerage: { balance: 400000, costBasis: 200000 } }),
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: 40000,
+      stateTax: "ca",
+    }));
+    const y = data.find(d => d.age === 55);
+    expect(y.capGains).toBeCloseTo(10000, -1); // $20K sold, half is gain
+    expect(y.stateTax).toBeGreaterThan(0);      // CA taxes income + gains as ordinary
+  });
 });
 
 // ─── Contribution limits ──────────────────────────────────────────────────────

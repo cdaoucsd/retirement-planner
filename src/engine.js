@@ -673,7 +673,9 @@ export function runProjection(params) {
     const trad401kGrowth   = Math.max(0, bal.trad401k - trad401kContribBasis - trad401kMatchBasis);
     const roth401kGrowth   = Math.max(0, bal.roth401k - roth401kContribBasis);
 
-    const grossInc   = yearW.trad401k + penAnnual + ssAnnual * 0.85 + conversion;
+    // Part-time wages are ordinary income; part-time Trad 401(k) deferrals are pre-tax.
+    const ptTaxable  = isSemiRetired ? Math.max(0, ptIncomeYr - ptScale * ptc.trad401k * 12) : 0;
+    const grossInc   = yearW.trad401k + penAnnual + ssAnnual * 0.85 + conversion + ptTaxable;
     const taxableInc = Math.max(0, grossInc - stdDedInflated);
     // Standard deduction left over after ordinary income shelters LTCG first
     const leftoverDed   = Math.max(0, stdDedInflated - grossInc);
