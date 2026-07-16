@@ -376,6 +376,12 @@ export function runProjection(params) {
     stateTax = 'none',
     marketAssumptions = MARKET_ASSUMPTIONS,
     spendingPhases = null,
+    partTimeEnabled = false,
+    partTimeStartAge = 55,
+    partTimeIncome = 0,
+    partTimeContrib = null,
+    partTimeMatchPct = 0,
+    partTimeMatchCapPct = 6,
   } = params;
 
   const baseBrackets = filingStatus === 'mfj' ? MFJ_TAX_BRACKETS_2025 : TAX_BRACKETS_2025;
@@ -393,6 +399,18 @@ export function runProjection(params) {
   const spending = clamp(annualSpending, 0, INPUT_LIMITS.spending.max);
   const wRate    = clamp(withdrawalRate, INPUT_LIMITS.withdrawalRate.min, INPUT_LIMITS.withdrawalRate.max);
   const rmdAge   = birthYear <= 1959 ? 73 : 75;
+
+  // Part-time (semi-retired) phase spans [ptAge, rAge). Needs at least one
+  // pre-retirement year after the current age to activate.
+  const ptEnabled = partTimeEnabled && rAge > cAge + 1;
+  const ptAge = ptEnabled ? clamp(partTimeStartAge, cAge + 1, rAge - 1) : Infinity;
+  const ptc = {
+    trad401k:  clamp(partTimeContrib?.trad401k,  0, 50000),
+    roth401k:  clamp(partTimeContrib?.roth401k,  0, 50000),
+    rothIRA:   clamp(partTimeContrib?.rothIRA,   0, 50000),
+    brokerage: clamp(partTimeContrib?.brokerage, 0, 50000),
+  };
+  const ptPlannedMonthly = ptc.trad401k + ptc.roth401k + ptc.rothIRA + ptc.brokerage;
 
   const getR = (acc, yearsFromNow) => accountReturnAtYear(acc, yearsFromNow, marketAssumptions);
 
@@ -436,37 +454,70 @@ export function runProjection(params) {
   };
 
   for (let age = cAge; age <= lAge; age++) {
-    const isRetired = age >= rAge;
+    const isRetired      = age >= rAge;
+    const isSemiRetired  = !isRetired && ptEnabled && age >= ptAge;
+    const isAccumulating = !isRetired && !isSemiRetired;
     const yearInfl      = Math.pow(1 + infRate / 100, age - cAge);
     const yrBrackets    = inflatedBrackets(yearInfl, baseBrackets);
     const stdDedInflated = stdDed * yearInfl;
     const yrStateBrackets = stateCfg ? inflatedBrackets(yearInfl, baseStateBrackets) : null;
     const stateStdDedInflated = stateStdDed * yearInfl;
 
+    const ssAnnual  = ssEnabled && age >= ssStartAge ? safeNum(ssMonthly) * 12 * yearInfl : 0;
+    const penAnnual = pensionEnabled && age >= pensionStartAge ? safeNum(pensionMonthly) * 12 : 0;
+
+    // Semi-retired year: part-time income (plus any SS/pension already
+    // started) covers spending first; a shortfall is withdrawn below, a
+    // surplus can fund the separate part-time contributions.
+    let ptIncomeYr = 0, ptSpendNeed = 0, ptScale = 0, ptMatchAnnual = 0;
+    if (isSemiRetired) {
+      ptIncomeYr = clamp(partTimeIncome, 0, INPUT_LIMITS.income.max) * yearInfl;
+      const spendYr = spending * spendingMultiplier(age, spendingPhases) * yearInfl;
+      const leftover = ptIncomeYr + ssAnnual + penAnnual - spendYr;
+      ptSpendNeed = Math.max(0, -leftover);
+
+      const plannedAnnual = ptPlannedMonthly * 12;
+      if (leftover > 0 && plannedAnnual > 0) ptScale = Math.min(1, leftover / plannedAnnual);
+
+      ptMatchAnnual = computeEmployerMatch({
+        income: ptIncomeYr,
+        matchPct: partTimeMatchPct,
+        capPct: partTimeMatchCapPct,
+        employeeMonthly: ptScale * (ptc.trad401k + ptc.roth401k),
+      });
+    }
+
     for (const k of ACCT_KEYS) {
       const mr = getR(accounts[k], age - cAge) / 12;
       for (let m = 0; m < 12; m++) {
         bal[k] *= (1 + mr);
-        if (!isRetired) {
+        if (isAccumulating) {
           bal[k] += clamp(accounts[k].monthly, 0, 50000);
           if (k === "trad401k") bal[k] += employerMonthlyMatch;
+        } else if (isSemiRetired) {
+          bal[k] += ptScale * ptc[k];
+          if (k === "trad401k") bal[k] += ptMatchAnnual / 12;
         }
         bal[k] = safeBal(bal[k]);
       }
     }
 
     // Track annual contribution amounts added to basis (accumulation years only)
-    if (!isRetired) {
+    if (isAccumulating) {
       trad401kContribBasis += clamp(accounts.trad401k.monthly, 0, 50000) * 12;
       trad401kMatchBasis   += employerAnnualMatch;
       roth401kContribBasis += clamp(accounts.roth401k.monthly, 0, 50000) * 12;
       rothIRAContribBasis  += clamp(accounts.rothIRA.monthly,  0, 50000) * 12;
       brokerageBasis       += clamp(accounts.brokerage.monthly, 0, 50000) * 12;
+    } else if (isSemiRetired) {
+      trad401kContribBasis += ptScale * ptc.trad401k * 12;
+      trad401kMatchBasis   += ptMatchAnnual;
+      roth401kContribBasis += ptScale * ptc.roth401k * 12;
+      rothIRAContribBasis  += ptScale * ptc.rothIRA  * 12;
+      brokerageBasis       += ptScale * ptc.brokerage * 12;
     }
 
     const total     = bal.trad401k + bal.roth401k + bal.rothIRA + bal.brokerage;
-    const ssAnnual  = ssEnabled && age >= ssStartAge ? safeNum(ssMonthly) * 12 * yearInfl : 0;
-    const penAnnual = pensionEnabled && age >= pensionStartAge ? safeNum(pensionMonthly) * 12 : 0;
     const income    = ssAnnual + penAnnual;
 
     const yearW = { trad401k: 0, roth401k: 0, rothIRA: 0, brokerage: 0 };
@@ -516,6 +567,32 @@ export function runProjection(params) {
       }
     }
 
+    // Draw `needed` from accounts in strategy order. Mutates balances and
+    // yearW, realizes brokerage gains. Returns any unmet remainder.
+    const drawFromOrder = (needed, order) => {
+      let rem = needed;
+      for (const { key } of order) {
+        if (rem <= 0) break;
+        if (key === "brokerage") {
+          const { take, gain } = sellBrokerage(rem);
+          yearW.brokerage += take;
+          realizedGains   += gain;
+          rem -= take;
+        } else {
+          const take = Math.min(rem, Math.max(0, bal[key]));
+          bal[key]    = safeBal(bal[key] - take);
+          yearW[key] += take;
+          rem -= take;
+        }
+      }
+      return rem;
+    };
+
+    if (isSemiRetired && ptSpendNeed > 0) {
+      strategy = computeWithdrawalOrder(age, rAge, { ...bal }, birthYear);
+      drawFromOrder(ptSpendNeed, strategy.order);
+    }
+
     let rmdRequired = 0, rmdExcess = 0;
     if (isRetired) {
       const target = withdrawalMode === "rate"
@@ -543,20 +620,7 @@ export function runProjection(params) {
         }
       }
 
-      for (const { key } of strategy.order) {
-        if (rem <= 0) break;
-        if (key === "brokerage") {
-          const { take, gain } = sellBrokerage(rem);
-          yearW.brokerage += take;
-          realizedGains   += gain;
-          rem -= take;
-        } else {
-          const take = Math.min(rem, Math.max(0, bal[key]));
-          bal[key]    = safeBal(bal[key] - take);
-          yearW[key] += take;
-          rem -= take;
-        }
-      }
+      drawFromOrder(rem, strategy.order);
     }
 
     // Apply IRS ordering rules to Roth IRA withdrawal to detect penalty risk
@@ -609,7 +673,9 @@ export function runProjection(params) {
     const trad401kGrowth   = Math.max(0, bal.trad401k - trad401kContribBasis - trad401kMatchBasis);
     const roth401kGrowth   = Math.max(0, bal.roth401k - roth401kContribBasis);
 
-    const grossInc   = yearW.trad401k + penAnnual + ssAnnual * 0.85 + conversion;
+    // Part-time wages are ordinary income; part-time Trad 401(k) deferrals are pre-tax.
+    const ptTaxable  = isSemiRetired ? Math.max(0, ptIncomeYr - ptScale * ptc.trad401k * 12) : 0;
+    const grossInc   = yearW.trad401k + penAnnual + ssAnnual * 0.85 + conversion + ptTaxable;
     const taxableInc = Math.max(0, grossInc - stdDedInflated);
     // Standard deduction left over after ordinary income shelters LTCG first
     const leftoverDed   = Math.max(0, stdDedInflated - grossInc);
@@ -642,7 +708,10 @@ export function runProjection(params) {
       conversion: Math.round(conversion),
       conversionTax: Math.round(conversionTax),
       conversionTaxFromBrokerage: Math.round(conversionTaxFromBrokerage),
-      employerMatchAnnual: isRetired ? 0 : Math.round(employerAnnualMatch),
+      employerMatchAnnual: isAccumulating ? Math.round(employerAnnualMatch) : 0,
+      partTimeIncome:        Math.round(ptIncomeYr),
+      partTimeContribAnnual: Math.round(ptScale * ptPlannedMonthly * 12),
+      partTimeMatchAnnual:   Math.round(ptMatchAnnual),
       rmdRequired: Math.round(rmdRequired),
       rmdExcess:   Math.round(rmdExcess),
       capGains:    Math.round(realizedGains),
