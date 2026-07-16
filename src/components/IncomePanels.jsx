@@ -1,5 +1,5 @@
 import { useMemo, useId } from "react";
-import { runProjection, ssClaimFactor, ssBreakEvenAge, safeNum } from "../engine.js";
+import { runProjection, ssClaimFactor, ssBreakEvenAge, safeNum, INPUT_LIMITS } from "../engine.js";
 import { fmt$, fmtFull } from "../format.js";
 import { Toggle, NumberInput } from "./ui.jsx";
 
@@ -94,25 +94,25 @@ export function PartTimeCard({ partTime, onChange, currentAge, retirementAge, an
         <NumberInput label="Start Age" value={partTime.startAge} onChange={v => set({ startAge: v })}
           prefix="" min={currentAge + 1} max={Math.max(currentAge + 1, retirementAge - 1)} small ariaLabel="Part-time start age" />
         <NumberInput label="Gross Annual Income" value={partTime.income} onChange={v => set({ income: v })}
-          max={5_000_000} step={1000} small ariaLabel="Part-time gross annual income" />
+          max={INPUT_LIMITS.income.max} step={1000} small ariaLabel="Part-time gross annual income" />
       </div>
       <p className="text-xs text-haze">Income is in today's dollars (inflation-adjusted each year) and taxed as ordinary income. Full-time contributions and match stop at this age.</p>
 
       <div>
         <p className="text-xs font-medium text-haze mb-1.5">Contributions during part-time years ($/mo, funded from leftover income)</p>
         <div className="grid grid-cols-2 gap-3">
-          <NumberInput label="Trad 401(k)" value={c.trad401k} onChange={v => setContrib("trad401k", v)} max={50000} small ariaLabel="Part-time Traditional 401(k) monthly contribution" />
-          <NumberInput label="Roth 401(k)" value={c.roth401k} onChange={v => setContrib("roth401k", v)} max={50000} small ariaLabel="Part-time Roth 401(k) monthly contribution" />
-          <NumberInput label="Roth IRA" value={c.rothIRA} onChange={v => setContrib("rothIRA", v)} max={50000} small ariaLabel="Part-time Roth IRA monthly contribution" />
-          <NumberInput label="Brokerage" value={c.brokerage} onChange={v => setContrib("brokerage", v)} max={50000} small ariaLabel="Part-time brokerage monthly contribution" />
+          <NumberInput label="Trad 401(k)" value={c.trad401k} onChange={v => setContrib("trad401k", v)} max={INPUT_LIMITS.monthly.max} small ariaLabel="Part-time Traditional 401(k) monthly contribution" />
+          <NumberInput label="Roth 401(k)" value={c.roth401k} onChange={v => setContrib("roth401k", v)} max={INPUT_LIMITS.monthly.max} small ariaLabel="Part-time Roth 401(k) monthly contribution" />
+          <NumberInput label="Roth IRA" value={c.rothIRA} onChange={v => setContrib("rothIRA", v)} max={INPUT_LIMITS.monthly.max} small ariaLabel="Part-time Roth IRA monthly contribution" />
+          <NumberInput label="Brokerage" value={c.brokerage} onChange={v => setContrib("brokerage", v)} max={INPUT_LIMITS.monthly.max} small ariaLabel="Part-time brokerage monthly contribution" />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <NumberInput label="Employer Match %" value={partTime.matchPct} onChange={v => set({ matchPct: v })}
-          prefix="" suffix="%" min={0} max={200} step={5} small ariaLabel="Part-time employer match percentage" />
+          prefix="" suffix="%" min={0} max={INPUT_LIMITS.matchPct.max} step={5} small ariaLabel="Part-time employer match percentage" />
         <NumberInput label="Match Cap (% of salary)" value={partTime.matchCapPct} onChange={v => set({ matchCapPct: v })}
-          prefix="" suffix="%" min={0} max={25} step={0.5} small ariaLabel="Part-time match cap as percent of salary" />
+          prefix="" suffix="%" min={0} max={INPUT_LIMITS.matchCapPct.max} step={0.5} small ariaLabel="Part-time match cap as percent of salary" />
       </div>
 
       <div className="bg-paper rounded-md p-2.5 border border-ink/5 text-xs space-y-1">

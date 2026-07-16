@@ -471,7 +471,7 @@ export function runProjection(params) {
     // surplus can fund the separate part-time contributions.
     let ptIncomeYr = 0, ptSpendNeed = 0, ptScale = 0, ptMatchAnnual = 0;
     if (isSemiRetired) {
-      ptIncomeYr = Math.max(0, safeNum(partTimeIncome)) * yearInfl;
+      ptIncomeYr = clamp(partTimeIncome, 0, INPUT_LIMITS.income.max) * yearInfl;
       const spendYr = spending * spendingMultiplier(age, spendingPhases) * yearInfl;
       const leftover = ptIncomeYr + ssAnnual + penAnnual - spendYr;
       ptSpendNeed = Math.max(0, -leftover);

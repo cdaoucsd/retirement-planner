@@ -963,6 +963,31 @@ describe("runProjection — part-time phase", () => {
     expect(y.capGains).toBeCloseTo(10000, -1); // $20K sold, half is gain
     expect(y.stateTax).toBeGreaterThan(0);      // CA taxes income + gains as ordinary
   });
+
+  it("phase never activates when there is no room before retirement", () => {
+    const data = runProjection(baseParams({
+      currentAge: 64, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 0,
+      accounts: baseAccounts({ trad: { monthly: 1000 } }),
+      partTimeEnabled: true, partTimeStartAge: 64, partTimeIncome: 50000,
+    }));
+    // rAge (65) is not > cAge+1 (65) → ptEnabled false → age 64 still accumulates
+    expect(data.find(d => d.age === 64).partTimeIncome).toBe(0);
+    expect(data.find(d => d.age === 65).trad401k).toBeCloseTo(12000, -1);
+  });
+
+  it("CA state tax rises when part-time income is present (discriminating check)", () => {
+    const mk = (income) => runProjection(baseParams({
+      currentAge: 54, retirementAge: 65, lifeExpectancy: 70,
+      withdrawalMode: "fixed", annualSpending: 0,
+      partTimeEnabled: true, partTimeStartAge: 55, partTimeIncome: income,
+      stateTax: "ca",
+    }));
+    const with40k = mk(40000).find(d => d.age === 55).stateTax;
+    const withZero = mk(0).find(d => d.age === 55).stateTax;
+    expect(withZero).toBe(0);
+    expect(with40k).toBeGreaterThan(0);
+  });
 });
 
 // ─── Contribution limits ──────────────────────────────────────────────────────
