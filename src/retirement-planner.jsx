@@ -392,7 +392,7 @@ export default function RetirementPlanner() {
 
         <div className="grid md:grid-cols-2 gap-4 mb-4">
           <AccountCard title="Traditional 401(k)" subtitle="Pre-tax contributions; taxed at withdrawal" icon="T" color="#3D5A80"
-            market={marketAssumptions}
+            market={marketAssumptions} currentAge={safeCurrentAge} retirementAge={safeRetirementAge}
             account={accounts.trad401k} onChange={a => setAccounts({ ...accounts, trad401k: a })}
             breakdown={[
               { label: "Your contributions", value: fmtFull(retD.trad401kContribBasis || 0) },
@@ -402,7 +402,7 @@ export default function RetirementPlanner() {
               { label: "Total", value: fmtFull(retD.trad401k || 0), bold: true },
             ]} />
           <AccountCard title="Roth 401(k)" subtitle="Post-tax contributions; tax-free at withdrawal" icon="R" color="#2E6E5E"
-            market={marketAssumptions}
+            market={marketAssumptions} currentAge={safeCurrentAge} retirementAge={safeRetirementAge}
             account={accounts.roth401k} onChange={a => setAccounts({ ...accounts, roth401k: a })}
             showContribBasis proRataNote
             breakdown={[
@@ -412,7 +412,7 @@ export default function RetirementPlanner() {
               { label: "Total", value: fmtFull(retD.roth401k || 0), bold: true },
             ]} />
           <AccountCard title="Roth IRA" icon="I" color="#6FA287"
-            market={marketAssumptions}
+            market={marketAssumptions} currentAge={safeCurrentAge} retirementAge={safeRetirementAge}
             account={accounts.rothIRA} onChange={a => setAccounts({ ...accounts, rothIRA: a })}
             showContribBasis
             breakdown={(() => {
@@ -430,7 +430,14 @@ export default function RetirementPlanner() {
             subtitle="Taxable; gains above cost basis taxed at capital-gains rates"
             market={marketAssumptions}
             account={accounts.brokerage} onChange={a => setAccounts({ ...accounts, brokerage: a })}
-            showCostBasis />
+            currentAge={safeCurrentAge} retirementAge={safeRetirementAge}
+            showCostBasis
+            breakdown={[
+              { label: "Cost basis (invested)", value: fmtFull(retD.brokerageBasis || 0) },
+              { label: "Growth (unrealized gains)", value: fmtFull(Math.max(0, (retD.brokerage || 0) - (retD.brokerageBasis || 0))) },
+              { divider: true, label: "div" },
+              { label: "Total", value: fmtFull(retD.brokerage || 0), bold: true },
+            ]} />
         </div>
 
         {showAssetLocationTip && (

@@ -1,13 +1,20 @@
-import { RETURN_PRESETS, INPUT_LIMITS, accountStockPct, accountReturnAtYear } from "../engine.js";
+import { RETURN_PRESETS, INPUT_LIMITS, accountStockPct, accountReturnAtYear, stockPctAtYear } from "../engine.js";
 import { NumberInput } from "./ui.jsx";
 
 // breakdown: [{ label, value, color?, bold? }] — shown as "At retirement" rows
 // showContribBasis: renders a contribution-basis input (for Roth accounts)
 // showCostBasis: renders a cost-basis input (for brokerage)
 // proRataNote: shows the 401(k) pro-rata rule warning
-export default function AccountCard({ title, icon, account, onChange, color, subtitle, breakdown, showContribBasis, showCostBasis, proRataNote, market }) {
+export default function AccountCard({ title, icon, account, onChange, color, subtitle, breakdown, showContribBasis, showCostBasis, proRataNote, market, currentAge, retirementAge }) {
   const stockPct = accountStockPct(account);
   const effRet = accountReturnAtYear(account, 0, market) * 100;
+
+  // Glide hint: does the 1%/yr glide actually reach the floor before retirement?
+  const glideFloorPct = Math.min(stockPct ?? 100, account.glideFloor ?? 30);
+  const yearsToRet = (currentAge != null && retirementAge != null) ? Math.max(0, retirementAge - currentAge) : null;
+  const stockAtRet = (account.glide && stockPct != null && yearsToRet != null) ? stockPctAtYear(account, yearsToRet) : null;
+  const floorAge   = (currentAge != null && stockPct != null) ? Math.round(currentAge + (stockPct - glideFloorPct)) : null;
+  const floorBindsByRet = stockAtRet != null && stockAtRet <= glideFloorPct + 1e-9;
 
   return (
     <div className="bg-white rounded-lg border border-ink/10 p-5 shadow-sm hover:shadow-md transition-shadow">
@@ -80,7 +87,11 @@ export default function AccountCard({ title, icon, account, onChange, color, sub
             <>
               <span className="text-ink/80 font-medium font-mono tnum">{stockPct}/{100 - stockPct}</span> stocks/bonds
               {" — ~"}<span className="text-ink/80 font-medium font-mono tnum">{effRet.toFixed(1)}%</span>/yr expected
-              {account.glide && <span> · glides to {Math.min(stockPct, account.glideFloor ?? 30)}% stocks</span>}
+              {account.glide && stockAtRet != null && (floorBindsByRet
+                ? <span> · glides to {glideFloorPct}% stocks by age {floorAge}</span>
+                : <span> · reaches {stockAtRet}% stocks by retirement · {glideFloorPct}% floor not hit until age {floorAge}</span>
+              )}
+              {account.glide && stockAtRet == null && <span> · glides to {glideFloorPct}% stocks</span>}
             </>
           ) : (
             <>Effective return: <span className="text-ink/80 font-medium font-mono tnum">{effRet.toFixed(1)}%</span> / year (flat)</>
